@@ -104,9 +104,19 @@ export interface Impact {
   business_impact: string;
 }
 
+export interface RootCause {
+  title: string;
+  description: string;
+}
+
+export interface RootCause {
+  title: string;
+  description: string;
+}
+
 export interface AIInvestigationResult {
   diagnosis: string;
-  root_cause: string;
+  root_cause: RootCause;
   confidence: number;
   business_impact: string;
   resolution_plan: string[];
