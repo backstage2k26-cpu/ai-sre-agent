@@ -10,7 +10,7 @@ interface Props {
 export default function VerdictCard({
   investigation,
 }: Props) {
-  const v = investigation.verdict;
+  const v = investigation.investigation_result;
 
   return (
     <GlassCard>

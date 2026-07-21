@@ -12,7 +12,7 @@ from app.schemas.dependency_summary import DependencySummary
 from app.schemas.evidence_score import EvidenceScore
 from app.schemas.recommendation import RecommendationSummary
 from app.schemas.executive_summary import ExecutiveSummary
-from app.schemas.verdict import Verdict
+from app.schemas.investigation_result import InvestigationResult
 from app.schemas.impact_summary import ImpactSummary
 from app.schemas.ai_investigation_result import AIInvestigationResult
 from app.schemas.log_summary import LogSummary
@@ -34,7 +34,7 @@ class InvestigationSummary(BaseModel):
     evidence: EvidenceScore | None = None
     recommendations: RecommendationSummary | None = None
     executive: ExecutiveSummary
-    verdict: Verdict | None = None
+    investigation_result: InvestigationResult | None = None
     impact: ImpactSummary | None = None
     ai_result: AIInvestigationResult | None = None
     log_summary: LogSummary | None = None

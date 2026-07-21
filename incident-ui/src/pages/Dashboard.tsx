@@ -3,13 +3,10 @@ import { Box, Typography } from "@mui/material";
 
 import KpiCard from "../components/KpiCard";
 import { getDashboard } from "../services/dashboardService";
-import RunningInvestigationsCard from "../components/RunningInvestigationsCard";
-import { getRunningInvestigations } from "../services/runningInvestigationService";
 import RecentIncidentsCard from "../components/RecentIncidentsCard";
 import { getRecentIncidents } from "../services/recentIncidentService";
 
-export default function Dashboard() {
-  const [runningInvestigations, setRunningInvestigations] = useState<any[]>([]);  
+export default function Dashboard() {  
   const [dashboard, setDashboard] = useState<any>(null);
   const [recentIncidents, setRecentIncidents] = useState<any[]>([]);
 
@@ -18,8 +15,6 @@ export default function Dashboard() {
       try {
         const data = await getDashboard();
         setDashboard(data);
-        const running = await getRunningInvestigations();
-        setRunningInvestigations(running);
         const recent = await getRecentIncidents();
         setRecentIncidents(recent);
       } catch (err) {
@@ -97,9 +92,6 @@ export default function Dashboard() {
           <KpiCard
             title="Avg Confidence"
             value={`${dashboard.avg_confidence}%`}
-          />
-          <RunningInvestigationsCard
-            investigations={runningInvestigations}
           />
           <RecentIncidentsCard
             incidents={recentIncidents}

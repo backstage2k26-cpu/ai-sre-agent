@@ -1,7 +1,7 @@
 from app.clients.grafana_client import GrafanaClient
 from app.schemas.investigation import InvestigationContext
 from app.schemas.logs import LogsInfo
-from app.schemas.investigation_result import InvestigationResult
+from app.schemas.investigation_assessment import InvestigationAssessment
 
 
 class LogsService:
@@ -65,7 +65,7 @@ class LogsService:
         self,
         error_count: int,
         warning_count: int,
-    ) -> InvestigationResult:
+    ) -> InvestigationAssessment:
 
         findings = []
 
@@ -115,7 +115,7 @@ class LogsService:
 
             summary = "Application logs may be related to the incident."
 
-        return InvestigationResult(
+        return InvestigationAssessment(
 
             source="Grafana Loki",
 

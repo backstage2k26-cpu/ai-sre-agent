@@ -10,8 +10,6 @@ import {
 
 import FactCheckIcon from "@mui/icons-material/FactCheck";
 import CheckCircleIcon from "@mui/icons-material/CheckCircle";
-import ScheduleIcon from "@mui/icons-material/Schedule";
-import PersonIcon from "@mui/icons-material/Person";
 
 import type { Investigation } from "../../../../types/investigation";
 
@@ -27,15 +25,22 @@ interface InfoRowProps {
 function InfoRow({ label, value }: InfoRowProps) {
   return (
     <Box
-      display="flex"
-      justifyContent="space-between"
-      alignItems="center"
-      py={1}
+        sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            py: 1,
+        }}
     >
-      <Typography fontWeight={600}>{label}</Typography>
-      <Typography color="text.secondary" textAlign="right">
+      <Typography
+          sx={{
+              fontWeight: 600,
+          }}
+      >
+
+      <Box textAlign="right">
         {value}
-      </Typography>
+      </Box>
     </Box>
   );
 }
@@ -43,12 +48,45 @@ function InfoRow({ label, value }: InfoRowProps) {
 export default function VerdictContent({
   investigation,
 }: Props) {
-  const verdict = investigation.verdict;
+
+  const result = investigation.investigation_result;
+
+  const confidence =
+    investigation.ai_result?.confidence ?? 0;
+
+  if (!result) {
+    return null;
+  }
+
+  const getResultColor = (
+    status: string,
+  ):
+    | "success"
+    | "warning"
+    | "error"
+    | "default" => {
+
+    switch (status) {
+
+      case "Confirmed":
+        return "success";
+
+      case "Likely":
+        return "warning";
+
+      case "Rejected":
+        return "error";
+
+      default:
+        return "default";
+    }
+  };
 
   return (
     <Stack spacing={3}>
+
       <Alert severity="success">
-        AI has completed the investigation and generated the final verdict.
+        AI has completed the investigation and generated the final investigation result.
       </Alert>
 
       <Paper
@@ -58,43 +96,30 @@ export default function VerdictContent({
         }}
       >
         <Typography variant="h6" gutterBottom>
-          Investigation Verdict
+          Investigation Result
         </Typography>
 
         <Divider sx={{ mb: 3 }} />
 
         <Stack spacing={1}>
+
           <InfoRow
             label="Status"
             value={
               <Chip
-                label={verdict.status}
-                color="success"
-                size="small"
+                label={result.status.toUpperCase()}
+                color={getResultColor(result.status)}
               />
             }
           />
 
           <InfoRow
             label="Confidence"
-            value={`${verdict.confidence}%`}
+            value={`${confidence}%`}
           />
 
-          <InfoRow
-            label="Root Cause"
-            value={verdict.root_cause}
-          />
-
-          <InfoRow
-            label="Recommended Owner"
-            value={verdict.owner}
-          />
-
-          <InfoRow
-            label="Investigation Time"
-            value={verdict.investigation_time}
-          />
         </Stack>
+
       </Paper>
 
       <Paper
@@ -104,17 +129,13 @@ export default function VerdictContent({
         }}
       >
         <Typography variant="h6" gutterBottom>
-          AI Summary
+          Summary
         </Typography>
 
         <Divider sx={{ mb: 2 }} />
 
         <Typography color="text.secondary">
-          Based on deployment analysis, Kubernetes inspection,
-          metrics, logs, networking and historical knowledge,
-          the AI identified the most probable root cause with
-          <strong> {verdict.confidence}% </strong>
-          confidence.
+          {result.summary}
         </Typography>
 
         <Box
@@ -123,10 +144,11 @@ export default function VerdictContent({
           gap={2}
           flexWrap="wrap"
         >
+
           <Chip
             icon={<FactCheckIcon />}
-            label="Final Verdict"
-            color="primary"
+            label={result.status}
+            color={getResultColor(result.status)}
           />
 
           <Chip
@@ -135,19 +157,10 @@ export default function VerdictContent({
             color="success"
           />
 
-          <Chip
-            icon={<PersonIcon />}
-            label={verdict.owner}
-            color="secondary"
-          />
-
-          <Chip
-            icon={<ScheduleIcon />}
-            label={verdict.investigation_time}
-            color="warning"
-          />
         </Box>
+
       </Paper>
+
     </Stack>
   );
 }

@@ -1,9 +1,9 @@
 import time
 
-from app.schemas.verdict import Verdict
+from app.schemas.investigation_result import InvestigationResult
 
 
-class VerdictService:
+class InvestigationResultService:
 
     async def generate(
         self,
@@ -11,12 +11,19 @@ class VerdictService:
         evidence,
         executive,
         started_at: float,
-    ) -> Verdict:
+    ) -> InvestigationResult:
 
         duration = round(time.time() - started_at, 1)
 
-        return Verdict(
-            status="Application Healthy",
+        if evidence.overall >= 90:
+            status = "Confirmed"
+        elif evidence.overall >= 70:
+            status = "Likely"
+        else:
+            status = "Inconclusive"
+
+        return InvestigationResult(
+            status=status,
             confidence=evidence.overall,
             root_cause=correlation.probable_root_cause,
             owner=executive.recommended_owner,

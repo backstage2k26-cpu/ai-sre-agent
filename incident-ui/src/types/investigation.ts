@@ -13,8 +13,9 @@ export interface Investigation {
   evidence: Evidence;
   recommendations: RecommendationSummary;
   executive: ExecutiveSummary;
-  verdict: Verdict;
+  investigation_result: InvestigationResult;
   impact: Impact;
+  ai_result: AIInvestigationResult;
 
   report: string;
 
@@ -86,12 +87,14 @@ export interface ExecutiveSummary {
   recommended_owner: string;
 }
 
-export interface Verdict {
-  status: string;
-  confidence: number;
-  root_cause: string;
-  owner: string;
-  investigation_time: string;
+export interface InvestigationResult {
+  status:
+        | "Confirmed"
+        | "Likely"
+        | "Inconclusive"
+        | "Rejected";
+
+  summary: string;
 }
 
 export interface Impact {
@@ -102,11 +105,6 @@ export interface Impact {
   affected_pods: string;
   dependent_services: string[];
   business_impact: string;
-}
-
-export interface RootCause {
-  title: string;
-  description: string;
 }
 
 export interface RootCause {

@@ -2,8 +2,14 @@ import {
   Card,
   CardContent,
   Typography,
-  Chip,
   Box,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
+  Chip,
 } from "@mui/material";
 
 interface Incident {
@@ -38,65 +44,124 @@ export default function RecentIncidentsCard({
     <Card
       sx={{
         mt: 4,
+        gridColumn: "1 / -1",
         backgroundColor: "#1b2333",
         color: "white",
         borderRadius: 3,
       }}
     >
       <CardContent>
-        <Typography
-          variant="h5"
-          sx={{ mb: 3 }}
+        <Box
+          sx={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            mb: 3,
+          }}
         >
-          Recent Incidents
-        </Typography>
+          <Typography
+            variant="h5"
+            sx={{ fontWeight: 600 }}
+          >
+            Recent Incidents
+          </Typography>
+
+          <Typography
+            sx={{
+              color: "#5DADE2",
+              cursor: "pointer",
+              fontWeight: 500,
+            }}
+          >
+            View All →
+          </Typography>
+        </Box>
 
         {incidents.length === 0 ? (
           <Typography color="gray">
             No incidents found.
           </Typography>
         ) : (
-          incidents.map((incident) => (
-            <Box
-              key={incident.number}
-              sx={{
-                mb: 3,
-                p: 2,
-                borderRadius: 2,
-                backgroundColor: "#27324a",
-              }}
-            >
-              <Typography variant="h6">
-                {incident.number}
-              </Typography>
+          <TableContainer>
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableCell sx={{ color: "#9CA3AF", fontWeight: 600 }}>
+                    Incident ID
+                  </TableCell>
 
-              <Typography sx={{ mb: 1 }}>
-                {incident.short_description}
-              </Typography>
+                  <TableCell sx={{ color: "#9CA3AF", fontWeight: 600 }}>
+                    Summary
+                  </TableCell>
 
-              <Chip
-                label={incident.priority}
-                color={priorityColor(incident.priority)}
-                size="small"
-                sx={{ mr: 1 }}
-              />
+                  <TableCell sx={{ color: "#9CA3AF", fontWeight: 600 }}>
+                    Priority
+                  </TableCell>
 
-              <Chip
-                label={incident.state}
-                size="small"
-              />
+                  <TableCell sx={{ color: "#9CA3AF", fontWeight: 600 }}>
+                    Status
+                  </TableCell>
 
-              <Typography
-                variant="body2"
-                color="gray"
-                sx={{ mt: 1 }}
-              >
-                {new Date(
-                  incident.opened_at
-                ).toLocaleString()}
-              </Typography>
-            </Box>
-          ))
+                  <TableCell sx={{ color: "#9CA3AF", fontWeight: 600 }}>
+                    Created At
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+
+              <TableBody>
+                                {incidents.map((incident) => (
+                  <TableRow
+                    key={incident.number}
+                    hover
+                    sx={{
+                      cursor: "pointer",
+                      "&:hover": {
+                        backgroundColor: "#27324a",
+                      },
+                    }}
+                  >
+                    <TableCell sx={{ color: "white" }}>
+                      {incident.number}
+                    </TableCell>
+
+                    <TableCell
+                      sx={{
+                        color: "white",
+                        maxWidth: 450,
+                      }}
+                    >
+                      {incident.short_description}
+                    </TableCell>
+
+                    <TableCell>
+                      <Chip
+                        label={incident.priority}
+                        color={priorityColor(incident.priority)}
+                        size="small"
+                      />
+                    </TableCell>
+
+                    <TableCell>
+                      <Chip
+                        label={incident.state}
+                        size="small"
+                        sx={{
+                          backgroundColor: "#374151",
+                          color: "white",
+                        }}
+                      />
+                    </TableCell>
+
+                    <TableCell sx={{ color: "#C7CEDB" }}>
+                      {new Date(
+                        incident.opened_at
+                      ).toLocaleString()}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
         )}
       </CardContent>
     </Card>

@@ -79,7 +79,7 @@ export default function IncidentSummaryContent({
 
             <Chip
               color="success"
-              label={`${investigation.verdict.confidence}%`}
+              label={`${investigation.ai_result.confidence}%`}
             />
           </Box>
         </Stack>

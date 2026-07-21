@@ -17,7 +17,9 @@ from app.services.network_service import NetworkService
 from app.services.dependency_service import DependencyService
 from app.services.recommendation_service import RecommendationService
 from app.services.executive_summary_service import ExecutiveSummaryService
-from app.services.verdict_service import VerdictService
+from app.services.investigation_result_service import (
+    InvestigationResultService,
+)
 from app.services.impact_service import ImpactService
 from app.services.timeline_service import TimelineService
 from app.services.investigation_reasoner import InvestigationReasoner
@@ -49,7 +51,7 @@ class InvestigationService:
         self.evidence = EvidenceAnalyzer()
         self.recommendations = RecommendationService()
         self.executive = ExecutiveSummaryService()
-        self.verdict = VerdictService()
+        self.investigation_result = InvestigationResultService()
         self.impact = ImpactService()
         self.timeline_service = TimelineService()
         self.reasoner = InvestigationReasoner()
@@ -212,16 +214,18 @@ class InvestigationService:
         )
 
         # ----------------------------------------------------
-        # Verdict
+        # INVESTIGATION RESULT
         # ----------------------------------------------------
 
-        print("\n========== 9. VERDICT ==========")
+        print("\n========== 9. INVESTIGATION RESULT ==========")
 
-        summary.verdict = await self.verdict.generate(
-            summary.correlation,
-            summary.evidence,
-            summary.executive,
-            started_at,
+        summary.investigation_result = (
+            await self.investigation_result.generate(
+                summary.correlation,
+                summary.evidence,
+                summary.executive,
+                started_at,
+            )
         )
 
         # ----------------------------------------------------

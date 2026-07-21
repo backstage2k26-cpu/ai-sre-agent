@@ -1,6 +1,6 @@
 from pydantic import BaseModel
 
-from app.schemas.investigation_result import InvestigationResult
+from app.schemas.investigation_assessment import InvestigationAssessment
 
 
 class LogsInfo(BaseModel):
@@ -12,4 +12,4 @@ class LogsInfo(BaseModel):
 
     recent_errors: bool
 
-    assessment: InvestigationResult
+    assessment: InvestigationAssessment

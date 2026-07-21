@@ -24,20 +24,20 @@ export default function KpiRow({
       />
 
       <KpiCard
-        title="Verdict"
-        value={investigation.verdict.status}
+        title="Investigation Result"
+        value={investigation.investigation_result.status}
         color="#22C55E"
       />
 
       <KpiCard
         title="Confidence"
-        value={`${investigation.verdict.confidence}%`}
+        value={`${investigation.investigation_result.confidence}%`}
         color="#8B5CF6"
       />
 
       <KpiCard
         title="Duration"
-        value={investigation.verdict.investigation_time}
+        value={investigation.investigation_result.investigation_time}
         color="#F59E0B"
       />
     </div>

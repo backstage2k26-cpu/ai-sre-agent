@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from app.clients.argocd_client import ArgoCDClient
 from app.schemas.deployment import DeploymentInfo
 from app.schemas.investigation import InvestigationContext
-from app.schemas.investigation_result import InvestigationResult
+from app.schemas.investigation_assessment import InvestigationAssessment
 from app.schemas.deployment_history import DeploymentHistory
 
 
@@ -150,7 +150,7 @@ class DeploymentService:
         sync: str,
         recent: bool,
         automated: bool,
-    ) -> InvestigationResult:
+    ) -> InvestigationAssessment:
 
         findings = []
 
@@ -193,7 +193,7 @@ class DeploymentService:
             severity = "MEDIUM"
             summary = "Deployment may be contributing to the incident."
 
-        return InvestigationResult(
+        return InvestigationAssessment(
             source="ArgoCD",
             confidence=round(confidence, 2),
             severity=severity,

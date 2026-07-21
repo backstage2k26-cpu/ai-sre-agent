@@ -31,25 +31,6 @@ def get_dashboard(
 
 
 @router.get("/running")
-async def get_running_investigations():
-    return [
-        {
-            "investigation_id": "INV-001",
-            "incident_number": "INC0010004",
-            "service": "market-qa",
-            "progress": 45,
-            "current_step": "Collecting Kubernetes Events",
-        },
-        {
-            "investigation_id": "INV-002",
-            "incident_number": "INC0010005",
-            "service": "payment",
-            "progress": 72,
-            "current_step": "AI Reasoning",
-        },
-    ]
-
-@router.get("/running")
 def get_running_investigations(
     db: Session = Depends(get_db),
 ):

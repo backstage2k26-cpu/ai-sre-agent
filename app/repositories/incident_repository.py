@@ -78,7 +78,7 @@ class IncidentRepository:
 
         return (
             self.db.query(Incident)
-            .order_by(Incident.created_at.desc())
+            .order_by(Incident.opened_at.desc())
             .limit(limit)
             .all()
         )
