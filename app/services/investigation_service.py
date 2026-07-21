@@ -261,7 +261,7 @@ class InvestigationService:
                 f"✅ AI Reasoner completed in {duration:.2f} seconds"
             )
 
-        except (APITimeoutError, APIError) as ex:
+        except Exception as ex:
 
             duration = time.time() - reasoner_started
 
@@ -270,6 +270,8 @@ class InvestigationService:
             )
             print(type(ex).__name__)
             print(ex)
+
+            raise
 
         except Exception as ex:
 
@@ -280,6 +282,8 @@ class InvestigationService:
             )
             print(type(ex).__name__)
             print(ex)
+
+            raise
 
         print("\n========== AI REASONER OUTPUT ==========")
         print(reasoning)

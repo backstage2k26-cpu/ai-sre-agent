@@ -8,6 +8,9 @@ from app.utils.incident_utils import (
     extract_namespace,
     get_search_window,
 )
+from app.schemas.incident_intent import IncidentIntent
+from app.resolvers.application_resolver import ApplicationResolver
+from app.utils.incident_utils import get_search_window
 
 
 class AnalysisService:
@@ -15,6 +18,8 @@ class AnalysisService:
     def __init__(self):
 
         self.llm = LLMClient()
+        self.llm = LLMClient()
+        self.resolver = ApplicationResolver()
 
         prompt_file = (
             Path(__file__).parent.parent
@@ -72,39 +77,40 @@ class AnalysisService:
         print(result)
         print("============================================\n")
 
-        namespace = (
-            result.get("namespace")
-            or extract_namespace(incident.description)
-            or "default"
+        # -------------------------------
+        # Parse Incident Intent
+        # -------------------------------
+
+        intent = IncidentIntent(
+            service_name=result.get("service_name", ""),
+            environment=result.get("environment", ""),
+            problem_type=result.get("problem_type", "Unknown"),
+            keywords=result.get("keywords", []),
         )
 
-        application = (
-            result.get("application_name")
-            or result.get("application")
-            or namespace
-        )
+        print("\n========== INCIDENT INTENT ==========")
+        print(intent)
+        print("=====================================\n")
 
-        service = (
-            result.get("service_name")
-            or result.get("service")
-            or application
-        )
+        # -------------------------------
+        # Resolve Application
+        # -------------------------------
 
-        problem = (
-            result.get("problem_type")
-            or result.get("problem")
-            or incident.short_description
-        )
+        context = self.resolver.resolve(intent)
+
+        print("\n========== APPLICATION CONTEXT ==========")
+        print(context)
+        print("=========================================\n")
 
         priority = incident.priority or "P3"
 
         return InvestigationContext(
             incident_number=incident.number,
-            service_name=service,
-            application_name=application,
-            namespace=namespace,
-            problem_type=problem,
+            service_name=context.service_name,
+            application_name=context.application_name,
+            namespace=context.namespace,
+            problem_type=context.problem_type,
             priority=priority,
             search_window_minutes=get_search_window(priority),
-            keywords=result.get("keywords", []),
+            keywords=context.keywords,
         )

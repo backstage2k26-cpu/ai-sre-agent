@@ -170,7 +170,10 @@ Schema:
 
 {{
   "diagnosis": "...",
-  "root_cause": "...",
+  "root_cause": {{
+    "title": "...",
+    "description": "..."
+  }},
   "confidence": 0,
   "business_impact": "...",
   "resolution_plan": [
@@ -193,6 +196,9 @@ Rules:
 - Do not wrap JSON in ``` blocks.
 - resolution_plan must be ordered from highest priority.
 - prevention should contain long-term improvements.
+- root_cause.title should be a short name (3–8 words).
+- root_cause.description should explain the technical cause in 2–4 sentences.
+- Do not repeat deployment or pod health in the description unless it is directly related to the failure.
 - reasoning should explain WHY you concluded the root cause.
 - confidence must be between 0 and 100.
 
@@ -206,6 +212,11 @@ Rules:
             user_prompt,
             settings.active_model,
         )
+
+        import json
+
+        print("\n========== AI REASONER OUTPUT ==========")
+        print(json.dumps(result, indent=2))
 
         print("Reasoner finished")
 
