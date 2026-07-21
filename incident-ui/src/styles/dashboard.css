@@ -1,0 +1,35 @@
+.dashboard {
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 24px;
+
+    padding: 24px;
+
+    background: #111827;
+
+    min-height: 100vh;
+
+}
+
+.grid-2 {
+
+    display: grid;
+
+    grid-template-columns: 1fr 1fr;
+
+    gap: 24px;
+
+}
+
+@media (max-width: 1100px) {
+
+    .grid-2 {
+
+        grid-template-columns: 1fr;
+
+    }
+
+}
