@@ -8,6 +8,18 @@ import { getDashboard } from "../services/dashboardService";
 import RecentIncidentsCard from "../components/RecentIncidentsCard";
 import { getRecentIncidents } from "../services/recentIncidentService";
 
+function formatAverageTime(value: string | number | null | undefined) {
+  if (value == null) return "0m";
+  return typeof value === "number" ? `${value}m` : value;
+}
+
+function formatConfidence(value: string | number | null | undefined) {
+  if (value == null) return "0%";
+  const normalized = typeof value === "number" ? value : Number(value);
+  if (Number.isNaN(normalized)) return "0%";
+  return `${normalized}%`;
+}
+
 export default function Dashboard() {  
   const [dashboard, setDashboard] = useState<any>(null);
   const [recentIncidents, setRecentIncidents] = useState<any[]>([]);
@@ -115,12 +127,12 @@ export default function Dashboard() {
           </Box>
 
           <Box className="kpi-grid">
-            <KpiCard title="Total Incidents" value={dashboard.total_incidents} tone="indigo" icon="clipboard" />
-            <KpiCard title="AI Resolved" value={dashboard.resolved} tone="green" icon="check" />
-            <KpiCard title="Failed Investigations" value={dashboard.failed} tone="red" icon="close" />
-            <KpiCard title="High Priority" value={dashboard.running_investigations + dashboard.failed} tone="amber" icon="flag" />
-            <KpiCard title="Avg Investigation Time" value={`${dashboard.avg_investigation_time}m`} tone="violet" icon="clock" />
-            <KpiCard title="Avg Confidence" value={`${dashboard.avg_confidence}%`} tone="blue" icon="pulse" />
+            <KpiCard title="Total Incidents" value={dashboard.total_incidents ?? 0} tone="indigo" icon="clipboard" />
+            <KpiCard title="AI Resolved" value={dashboard.resolved ?? 0} tone="green" icon="check" />
+            <KpiCard title="Failed Investigations" value={dashboard.failed ?? 0} tone="red" icon="close" />
+            <KpiCard title="High Priority" value={dashboard.high_priority_incidents ?? 0} tone="amber" icon="flag" />
+            <KpiCard title="Avg Investigation Time" value={formatAverageTime(dashboard.avg_investigation_time)} tone="violet" icon="clock" />
+            <KpiCard title="Avg Confidence" value={formatConfidence(dashboard.avg_confidence)} tone="blue" icon="pulse" />
           </Box>
 
           <RecentIncidentsCard incidents={recentIncidents} />

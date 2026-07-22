@@ -15,15 +15,33 @@ def get_dashboard(
     incident_repo = IncidentRepository(db)
     investigation_repo = InvestigationRepository(db)
 
-    running = investigation_repo.get_running()
-    completed = investigation_repo.get_completed()
-    failed = investigation_repo.get_failed()
+    incidents = incident_repo.list_all()
+
+    running = 0
+    completed = 0
+    failed = 0
+
+    for incident in incidents:
+        latest = investigation_repo.get_latest_by_incident(
+            incident.number
+        )
+
+        if latest is None:
+            continue
+
+        if latest.status == "RUNNING":
+            running += 1
+        elif latest.status == "COMPLETED":
+            completed += 1
+        elif latest.status == "FAILED":
+            failed += 1
 
     return {
         "total_incidents": incident_repo.count_all(),
-        "running_investigations": len(running),
-        "resolved": len(completed),
-        "failed": len(failed),
+        "high_priority_incidents": incident_repo.count_high_priority(),
+        "running_investigations": running,
+        "resolved": completed,
+        "failed": failed,
         "avg_investigation_time": investigation_repo.get_average_investigation_time(),
         "avg_confidence": investigation_repo.get_average_confidence(),
     }

@@ -228,7 +228,6 @@ class InvestigationRepository:
             self.db.query(Investigation)
             .filter(
                 Investigation.status == InvestigationStatus.COMPLETED,
-                Investigation.completed_at.isnot(None),
             )
             .all()
         )
@@ -236,16 +235,29 @@ class InvestigationRepository:
         if not completed:
             return "0m"
 
-        total = timedelta()
+        total_seconds = 0.0
+        counted = 0
 
         for investigation in completed:
-            total += (
-                investigation.completed_at - investigation.started_at
+            duration_seconds = self._extract_investigation_duration_seconds(
+                investigation
             )
 
-        average = total / len(completed)
+            if duration_seconds is None:
+                continue
 
-        minutes = int(average.total_seconds() // 60)
+            total_seconds += duration_seconds
+            counted += 1
+
+        if counted == 0:
+            return "0m"
+
+        average_seconds = total_seconds / counted
+
+        if average_seconds < 60:
+          return f"{round(average_seconds)}s"
+
+        minutes = int(average_seconds // 60)
 
         if minutes < 60:
             return f"{minutes}m"
@@ -272,12 +284,8 @@ class InvestigationRepository:
         count = 0
 
         for investigation in completed:
-            report = investigation.report or {}
-
-            confidence = (
-                report.get("logs", {})
-                .get("assessment", {})
-                .get("confidence")
+            confidence = self._extract_investigation_confidence(
+                investigation
             )
 
             if confidence is not None:
@@ -287,7 +295,116 @@ class InvestigationRepository:
         if count == 0:
             return 0.0
 
-        return round((total / count) * 100, 1)
+        return round(total / count, 1)
+
+    def _extract_investigation_duration_seconds(
+        self,
+        investigation: Investigation,
+    ) -> float | None:
+        if investigation.completed_at and investigation.started_at:
+            return (
+                investigation.completed_at - investigation.started_at
+            ).total_seconds()
+
+        report = investigation.report or {}
+        duration = self._get_nested_value(
+            report,
+            [
+                ["investigation_result", "investigation_time"],
+                ["ai_result", "estimated_recovery_time"],
+            ],
+        )
+
+        if isinstance(duration, str):
+            parsed = self._parse_duration_to_seconds(duration)
+            if parsed is not None:
+                return parsed
+
+        return None
+
+    def _extract_investigation_confidence(
+        self,
+        investigation: Investigation,
+    ) -> float | None:
+        report = investigation.report or {}
+
+        confidence = self._get_nested_value(
+            report,
+            [
+                ["investigation_result", "confidence"],
+                ["ai_result", "confidence"],
+                ["evidence", "overall"],
+                ["correlation", "confidence"],
+                ["logs", "assessment", "confidence"],
+                ["deployment", "assessment", "confidence"],
+                ["metrics", "assessment", "confidence"],
+            ],
+        )
+
+        if confidence is None:
+            return None
+
+        try:
+            return float(confidence)
+        except (TypeError, ValueError):
+            return None
+
+    def _get_nested_value(
+        self,
+        data: dict,
+        paths: list[list[str]],
+    ):
+        for path in paths:
+            current = data
+            for key in path:
+                if not isinstance(current, dict) or key not in current:
+                    current = None
+                    break
+                current = current[key]
+
+            if current is not None:
+                return current
+
+        return None
+
+    def _parse_duration_to_seconds(
+        self,
+        duration: str,
+    ) -> float | None:
+        value = duration.strip().lower()
+
+        if value.endswith("sec") or value.endswith("secs") or value.endswith("s"):
+            number = value.replace("secs", "").replace("sec", "").replace("s", "").strip()
+            try:
+                return float(number)
+            except ValueError:
+                return None
+
+        if value.endswith("m") or value.endswith("min") or value.endswith("mins"):
+            number = (
+                value.replace("mins", "")
+                .replace("min", "")
+                .replace("m", "")
+                .strip()
+            )
+            try:
+                return float(number) * 60
+            except ValueError:
+                return None
+
+        if value.endswith("h") or value.endswith("hr") or value.endswith("hrs"):
+            number = (
+                value.replace("hrs", "")
+                .replace("hr", "")
+                .replace("h", "")
+                .strip()
+            )
+            try:
+                return float(number) * 3600
+            except ValueError:
+                return None
+
+        return None
 
     def get_latest_by_incident(
         self,
