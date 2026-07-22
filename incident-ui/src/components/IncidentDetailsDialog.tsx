@@ -99,8 +99,15 @@ export default function IncidentDetailsDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      maxWidth="md"
+      maxWidth="lg"
       fullWidth
+      PaperProps={{
+        sx: {
+          width: "min(1100px, calc(100vw - 32px))",
+          maxWidth: "1100px",
+          overflowX: "hidden",
+        },
+      }}
     >
       <DialogTitle
         sx={{
@@ -132,6 +139,7 @@ export default function IncidentDetailsDialog({
         sx={{
           px: 4,
           py: 5,
+          overflowX: "hidden",
         }}
       >
         {loading ? (
@@ -145,8 +153,8 @@ export default function IncidentDetailsDialog({
             <CircularProgress />
           </Box>
         ) : details ? (
-          <Grid container rowSpacing={5}>
-            <Grid size={{ xs: 3 }}>
+           <Grid container rowSpacing={4} columnSpacing={3}>
+            <Grid size={{ xs: 12, sm: 4, md: 3 }}>
               <Typography
                 color="text.secondary"
                 fontWeight={500}
@@ -155,16 +163,17 @@ export default function IncidentDetailsDialog({
               </Typography>
             </Grid>
 
-            <Grid size={{ xs: 9 }}>
+            <Grid size={{ xs: 12, sm: 8, md: 9 }}>
               <Typography
                 fontWeight={600}
                 color="text.primary"
+                 sx={{ wordBreak: "break-word" }}
               >
                 {details.incident.number}
               </Typography>
             </Grid>
 
-            <Grid size={{ xs: 3 }}>
+            <Grid size={{ xs: 12, sm: 4, md: 3 }}>
               <Typography
                 color="text.secondary"
                 fontWeight={500}
@@ -173,10 +182,11 @@ export default function IncidentDetailsDialog({
               </Typography>
             </Grid>
 
-            <Grid size={{ xs: 9 }}>
+            <Grid size={{ xs: 12, sm: 8, md: 9 }}>
               <Typography
                 fontWeight={600}
                 color="text.primary"
+                sx={{ wordBreak: "break-word" }}
               >
                 {
                   details.incident.service ??
@@ -195,16 +205,17 @@ export default function IncidentDetailsDialog({
               </Typography>
             </Grid>
 
-            <Grid size={{ xs: 9 }}>
+            <Grid size={{ xs: 12, sm: 8, md: 9 }}>
               <Typography
                 fontWeight={600}
                 color="text.primary"
+                sx={{ wordBreak: "break-word" }}
               >
                 {details.incident.short_description}
               </Typography>
             </Grid>
 
-            <Grid size={{ xs: 3 }}>
+            <Grid size={{ xs: 12, sm: 4, md: 3 }}>
               <Typography
                 color="text.secondary"
                 fontWeight={500}
@@ -213,10 +224,11 @@ export default function IncidentDetailsDialog({
               </Typography>
             </Grid>
 
-            <Grid size={{ xs: 9 }}>
+            <Grid size={{ xs: 12, sm: 8, md: 9 }}>
               <Typography
                 fontWeight={600}
                 color="text.primary"
+                sx={{ wordBreak: "break-word" }}
               >
                 {new Date(
                   details.incident.opened_at ??
@@ -225,7 +237,7 @@ export default function IncidentDetailsDialog({
               </Typography>
             </Grid>
 
-            <Grid size={{ xs: 3 }}>
+            <Grid size={{ xs: 12, sm: 4, md: 3 }}>
               <Typography
                 color="text.secondary"
                 fontWeight={500}
@@ -234,16 +246,17 @@ export default function IncidentDetailsDialog({
               </Typography>
             </Grid>
 
-            <Grid size={{ xs: 9 }}>
+            <Grid size={{ xs: 12, sm: 8, md: 9 }}>
               <Typography
                 fontWeight={600}
                 color="text.primary"
+                sx={{ wordBreak: "break-word" }}
               >
                 {`P${details.incident.priority}`}
               </Typography>
             </Grid>
 
-            <Grid size={{ xs: 3 }}>
+            <Grid size={{ xs: 12, sm: 4, md: 3 }}>
               <Typography
                 color="text.secondary"
                 fontWeight={500}
@@ -252,8 +265,8 @@ export default function IncidentDetailsDialog({
               </Typography>
             </Grid>
 
-            <Grid size={{ xs: 9 }}>
-              <Typography fontWeight={600}>
+            <Grid size={{ xs: 12, sm: 8, md: 9 }}>
+              <Typography fontWeight={600} sx={{ wordBreak: "break-word" }}>
                 {details.incident.state}
               </Typography>
             </Grid>
