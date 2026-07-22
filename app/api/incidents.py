@@ -75,6 +75,7 @@ def get_incident_details(
             "number": incident.number,
             "short_description": incident.short_description,
             "service": incident.service,
+            "configuration_item": incident.configuration_item,
             "priority": incident.priority,
             "state": incident.state,
             "caller": incident.caller,

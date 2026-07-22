@@ -203,6 +203,22 @@ export default function Incidents() {
             { key: "resolved", label: "Resolved", count: incidents.filter((i) => i.state.toLowerCase().includes("resolve")).length },
           ].map((item) => {
             const active = filter === item.key;
+            const tone =
+              item.key === "all"
+                ? "#FF5B1F"
+                : item.key === "new"
+                  ? "#3B82F6"
+                  : item.key === "progress"
+                    ? "#F59E0B"
+                    : "#10B981";
+            const toneBg =
+              item.key === "all"
+                ? "#FFF1EA"
+                : item.key === "new"
+                  ? "#EEF4FF"
+                  : item.key === "progress"
+                    ? "#FFF7E5"
+                    : "#ECFDF5";
             return (
               <Chip
                 key={item.key}
@@ -219,14 +235,7 @@ export default function Incidents() {
                         width: 8,
                         height: 8,
                         borderRadius: "50%",
-                        bgcolor:
-                          item.key === "all"
-                            ? "#FF5B1F"
-                            : item.key === "new"
-                            ? "#3B82F6"
-                            : item.key === "progress"
-                            ? "#F59E0B"
-                            : "#10B981",
+                        bgcolor: active ? tone : tone,
                       }}
                     />
 
@@ -234,6 +243,7 @@ export default function Incidents() {
                       sx={{
                         fontWeight: 700,
                         fontSize: 15,
+                        color: active ? tone : "#64748B",
                       }}
                     >
                       {item.label}
@@ -265,10 +275,14 @@ export default function Incidents() {
                   borderRadius: 999,
                   fontWeight: 800,
                   fontSize: 13.5,
-                  bgcolor: active ? "#FFF5EF" : "#fff",
-                  color: active ? "#FF5B1F" : "#64748B",
-                  border: active ? "1px solid #FF5B1F" : "1px solid rgba(226,232,240,.95)",
+                  bgcolor: active ? toneBg : "#fff",
+                  color: active ? tone : "#64748B",
+                  border: active ? `1px solid ${tone}` : "1px solid rgba(226,232,240,.95)",
                   boxShadow: "0 6px 16px rgba(15,23,42,.06)",
+                  "&:hover": {
+                    borderColor: tone,
+                    bgcolor: active ? toneBg : "#fff",
+                  },
                   "& .MuiChip-label": {
                     px: 1.25,
                   },
@@ -278,7 +292,14 @@ export default function Incidents() {
           })}
         </Box>
 
-        <Box sx={{ display: "flex", gap: 1.5, alignItems: "center" }}>
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1fr) 170px" },
+            gap: 1.5,
+            alignItems: "center",
+          }}
+        >
           <Box
             sx={{
               flex: 1,
@@ -326,62 +347,77 @@ export default function Incidents() {
             />
           </Box>
 
-          <Select
-            value={priority}
-            onChange={(e) => setPriority(e.target.value)}
-            size="small"
-            MenuProps={{
-              slotProps: {
-                paper: {
-                  sx: {
-                    mt: 0.5,
-                    width: 128,
-                    minWidth: 128,
-                    p: 0.35,
-                    borderRadius: "12px",
-                    bgcolor: "#3E3E3E",
-                    boxShadow: "0 12px 28px rgba(0,0,0,.35)",
-                    border: "1px solid rgba(255,255,255,.10)",
+          <Box sx={{ width: 170, justifySelf: "end" }}>
+            <Select
+              value={priority}
+              onChange={(e) => setPriority(e.target.value)}
+              size="small"
+              fullWidth
+              MenuProps={{
+                slotProps: {
+                  paper: {
+                    sx: {
+                      mt: 0.5,
+                      width: 128,
+                      minWidth: 128,
+                      p: 0.35,
+                      borderRadius: "12px",
+                      bgcolor: "#3E3E3E",
+                      boxShadow: "0 12px 28px rgba(0,0,0,.35)",
+                      border: "1px solid rgba(255,255,255,.10)",
 
-                    "& .MuiMenu-list": {
-                      p: 0,
-                    },
+                      "& .MuiMenu-list": {
+                        p: 0,
+                      },
 
-                    "& .MuiMenuItem-root": {
-                      minHeight: 28,
-                      height: 28,
-                      px: 1.2,
-                      my: 0.15,
-                      mx: 0.15,
-                      borderRadius: "8px",
-                      fontSize: 13,
-                      fontWeight: 500,
-                      color: "#FFFFFF",
-                    },
+                      "& .MuiMenuItem-root": {
+                        minHeight: 28,
+                        height: 28,
+                        px: 1.2,
+                        my: 0.15,
+                        mx: 0.15,
+                        borderRadius: "8px",
+                        fontSize: 13,
+                        fontWeight: 500,
+                        color: "#FFFFFF",
+                      },
 
-                    "& .Mui-selected": {
-                      bgcolor: "#5B8EF1 !important",
-                      color: "#fff",
+                      "& .Mui-selected": {
+                        bgcolor: "#5B8EF1 !important",
+                        color: "#fff",
+                      },
                     },
-                  }
+                  },
                 },
-              },
-            }}
-            sx={{
-              minWidth: 170,
-              height: 52,
-              bgcolor: "#fff",
-              borderRadius: "16px",
-              "& fieldset": {
-                borderColor: "#E5E7EB",
-              },
-            }}
-          >
-            <MenuItem value="all">All Priorities</MenuItem>
-            <MenuItem value="P1">P1</MenuItem>
-            <MenuItem value="P2">P2</MenuItem>
-            <MenuItem value="P3">P3</MenuItem>
-          </Select>
+              }}
+              sx={{
+                height: 44,
+                width: "100%",
+                minWidth: 0,
+                "& .MuiSelect-select": {
+                  px: 1.5,
+                  py: 0.35,
+                  fontSize: 13.5,
+                  lineHeight: 1.1,
+                  display: "flex",
+                  alignItems: "center",
+                },
+                "& .MuiSelect-icon": {
+                  top: "calc(50% - 0.4em)",
+                },
+                bgcolor: "#fff",
+                borderRadius: "12px",
+                "& fieldset": {
+                  borderColor: "#E5E7EB",
+                },
+              }}
+            >
+              <MenuItem value="all">All Priorities</MenuItem>
+              <MenuItem value="P1">P1</MenuItem>
+              <MenuItem value="P2">P2</MenuItem>
+              <MenuItem value="P3">P3</MenuItem>
+            </Select>
+          </Box>
         </Box>
 
         <Box
