@@ -1,8 +1,6 @@
 import {
-  Card,
-  CardContent,
-  Typography,
   Box,
+  Typography,
   Table,
   TableBody,
   TableCell,
@@ -27,19 +25,6 @@ interface Props {
   incidents: Incident[];
 }
 
-function priorityColor(priority: string) {
-  switch (priority) {
-    case "1":
-    case "P1":
-      return "error";
-    case "2":
-    case "P2":
-      return "warning";
-    default:
-      return "primary";
-  }
-}
-
 export default function RecentIncidentsCard({
   incidents,
 }: Props) {
@@ -54,76 +39,119 @@ export default function RecentIncidentsCard({
       setDialogOpen(true);
     };
   return (
-    <Card
+    <Box
       sx={{
-        mt: 4,
+        mt: 2,
         gridColumn: "1 / -1",
-        backgroundColor: "#1b2333",
-        color: "white",
-        borderRadius: 3,
+        borderRadius: "22px",
+        background: "rgba(255,255,255,.96)",
+        border: "1px solid rgba(226,232,240,.9)",
+        boxShadow: "0 12px 34px rgba(15,23,42,.08)",
+        overflow: "hidden",
       }}
     >
-      <CardContent>
-        <Box
-          sx={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            mb: 3,
-          }}
-        >
+      <Box
+        sx={{
+          px: { xs: 2, md: 3 },
+          pt: { xs: 2, md: 2.25 },
+          pb: { xs: 2, md: 2 },
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: { xs: "flex-start", md: "center" },
+          gap: 1,
+        }}
+      >
+        <Box>
           <Typography
-            variant="h5"
-            sx={{ fontWeight: 600 }}
+            sx={{
+              fontSize: 18,
+              fontWeight: 800,
+              color: "var(--text-strong)",
+              lineHeight: 1.1,
+            }}
           >
             Recent Incidents
           </Typography>
 
           <Typography
             sx={{
-              color: "#5DADE2",
-              cursor: "pointer",
-              fontWeight: 500,
+              mt: 0.55,
+              fontSize: 12,
+              fontWeight: 600,
+              color: "var(--text-soft)",
+              lineHeight: 1.2,
             }}
-            onClick={() => navigate("/incidents")}
           >
-            View All →
+            Last updated just now
           </Typography>
         </Box>
 
-        {incidents.length === 0 ? (
-          <Typography color="gray">
+        <Typography
+          sx={{
+            color: "var(--accent)",
+            cursor: "pointer",
+            fontWeight: 800,
+            fontSize: 13,
+            whiteSpace: "nowrap",
+            lineHeight: 1,
+          }}
+          onClick={() => navigate("/incidents")}
+        >
+          View all
+          <Box component="span" sx={{ ml: 1 }}>
+            ›
+          </Box>
+        </Typography>
+      </Box>
+
+      {incidents.length === 0 ? (
+        <Box sx={{ px: 3, pb: 3 }}>
+          <Typography sx={{ color: "var(--text-soft)" }}>
             No incidents found.
           </Typography>
-        ) : (
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell sx={{ color: "#9CA3AF", fontWeight: 600 }}>
-                    Incident ID
-                  </TableCell>
+        </Box>
+      ) : (
+        <TableContainer sx={{ px: 0 }}>
+          <Table sx={{ minWidth: 900 }}>
+            <TableHead>
+              <TableRow
+                sx={{
+                  background: "#F8FAFC",
+                  "& .MuiTableCell-root": {
+                    color: "#A8B3C7",
+                    fontWeight: 800,
+                    letterSpacing: "0.08em",
+                    fontSize: 13,
+                    borderBottom: "1px solid #E7EBF3",
+                  },
+                }}
+              >
+                <TableCell sx={{ pl: { xs: 3, md: 5 } }}>Incident ID</TableCell>
+                <TableCell>Summary</TableCell>
+                <TableCell>Priority</TableCell>
+                <TableCell>Status</TableCell>
+                <TableCell sx={{ pr: { xs: 3, md: 5 } }}>Created At</TableCell>
+              </TableRow>
+            </TableHead>
 
-                  <TableCell sx={{ color: "#9CA3AF", fontWeight: 600 }}>
-                    Summary
-                  </TableCell>
+            <TableBody>
+              {incidents.map((incident) => {
+                const state = incident.state?.toLowerCase?.() ?? "";
+                const statusLabel =
+                  state.includes("progress")
+                    ? "In Progress"
+                    : state.includes("resolve")
+                      ? "Resolved"
+                      : "New";
 
-                  <TableCell sx={{ color: "#9CA3AF", fontWeight: 600 }}>
-                    Priority
-                  </TableCell>
+                const statusSx =
+                  statusLabel === "Resolved"
+                    ? { bgcolor: "#ECFDF5", color: "#059669" }
+                    : statusLabel === "In Progress"
+                      ? { bgcolor: "#FFF7E6", color: "#D97706" }
+                      : { bgcolor: "#EEF4FF", color: "#3B82F6" };
 
-                  <TableCell sx={{ color: "#9CA3AF", fontWeight: 600 }}>
-                    Status
-                  </TableCell>
-
-                  <TableCell sx={{ color: "#9CA3AF", fontWeight: 600 }}>
-                    Created At
-                  </TableCell>
-                </TableRow>
-              </TableHead>
-
-              <TableBody>
-                                {incidents.map((incident) => (
+                return (
                   <TableRow
                     key={incident.number}
                     hover
@@ -131,54 +159,64 @@ export default function RecentIncidentsCard({
                     sx={{
                       cursor: "pointer",
                       "&:hover": {
-                        backgroundColor: "#27324a",
+                        backgroundColor: "#F8FAFC",
+                      },
+                      "& .MuiTableCell-root": {
+                        borderBottom: "1px solid #EEF2F7",
+                        fontSize: 15,
+                        py: 2.1,
                       },
                     }}
                   >
-                    <TableCell sx={{ color: "white" }}>
+                    <TableCell sx={{ pl: { xs: 3, md: 5 }, color: "var(--accent)", fontWeight: 800, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
                       {incident.number}
                     </TableCell>
-
-                    <TableCell
-                      sx={{
-                        color: "white",
-                        maxWidth: 450,
-                      }}
-                    >
+                    <TableCell sx={{ color: "var(--text-strong)", maxWidth: 520, fontWeight: 500 }}>
                       {incident.short_description}
                     </TableCell>
-
                     <TableCell>
                       <Chip
                         label={incident.priority}
-                        color={priorityColor(incident.priority)}
-                        size="small"
-                      />
-                    </TableCell>
-
-                    <TableCell>
-                      <Chip
-                        label={incident.state}
                         size="small"
                         sx={{
-                          backgroundColor: "#374151",
-                          color: "white",
+                          fontWeight: 800,
+                          borderRadius: 999,
+                          bgcolor:
+                            incident.priority === "1" || incident.priority === "P1"
+                              ? "#FEF2F2"
+                              : incident.priority === "2" || incident.priority === "P2"
+                                ? "#FFFBEB"
+                                : "#F3F4F6",
+                          color:
+                            incident.priority === "1" || incident.priority === "P1"
+                              ? "#EF4444"
+                              : incident.priority === "2" || incident.priority === "P2"
+                                ? "#D97706"
+                                : "#6B7280",
                         }}
                       />
                     </TableCell>
-
-                    <TableCell sx={{ color: "#C7CEDB" }}>
-                      {new Date(
-                        incident.opened_at
-                      ).toLocaleString()}
+                    <TableCell>
+                      <Chip
+                        label={statusLabel}
+                        size="small"
+                        sx={{
+                          fontWeight: 800,
+                          borderRadius: 999,
+                          ...statusSx,
+                        }}
+                      />
+                    </TableCell>
+                    <TableCell sx={{ pr: { xs: 3, md: 5 }, color: "#AAB5CA" }}>
+                      {new Date(incident.opened_at).toLocaleString()}
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        )}
-      </CardContent>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </TableContainer>
+      )}
       <IncidentDetailsDialog
         open={dialogOpen}
         incidentNumber={selectedIncident}
@@ -187,6 +225,6 @@ export default function RecentIncidentsCard({
           setSelectedIncident(null);
         }}
       />
-    </Card>
+    </Box>
   );
 }
