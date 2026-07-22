@@ -80,11 +80,6 @@ export default function Dashboard() {
           />
 
           <KpiCard
-            title="High Priority"
-            value={dashboard.high_priority}
-          />
-
-          <KpiCard
             title="Avg Investigation Time"
             value={dashboard.avg_investigation_time}
           />

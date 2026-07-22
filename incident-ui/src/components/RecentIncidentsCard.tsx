@@ -11,6 +11,9 @@ import {
   TableRow,
   Chip,
 } from "@mui/material";
+import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import IncidentDetailsDialog from "./IncidentDetailsDialog";
 
 interface Incident {
   number: string;
@@ -40,6 +43,16 @@ function priorityColor(priority: string) {
 export default function RecentIncidentsCard({
   incidents,
 }: Props) {
+    const navigate = useNavigate();
+    const [selectedIncident, setSelectedIncident] =
+      useState<string | null>(null);
+
+    const [dialogOpen, setDialogOpen] = useState(false);
+
+    const openIncident = (number: string) => {
+      setSelectedIncident(number);
+      setDialogOpen(true);
+    };
   return (
     <Card
       sx={{
@@ -72,6 +85,7 @@ export default function RecentIncidentsCard({
               cursor: "pointer",
               fontWeight: 500,
             }}
+            onClick={() => navigate("/incidents")}
           >
             View All →
           </Typography>
@@ -113,6 +127,7 @@ export default function RecentIncidentsCard({
                   <TableRow
                     key={incident.number}
                     hover
+                    onClick={() => openIncident(incident.number)}
                     sx={{
                       cursor: "pointer",
                       "&:hover": {
@@ -164,6 +179,14 @@ export default function RecentIncidentsCard({
           </TableContainer>
         )}
       </CardContent>
+      <IncidentDetailsDialog
+        open={dialogOpen}
+        incidentNumber={selectedIncident}
+        onClose={() => {
+          setDialogOpen(false);
+          setSelectedIncident(null);
+        }}
+      />
     </Card>
   );
 }

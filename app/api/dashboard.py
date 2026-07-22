@@ -24,7 +24,6 @@ def get_dashboard(
         "running_investigations": len(running),
         "resolved": len(completed),
         "failed": len(failed),
-        "high_priority": incident_repo.count_high_priority(),
         "avg_investigation_time": investigation_repo.get_average_investigation_time(),
         "avg_confidence": investigation_repo.get_average_confidence(),
     }
