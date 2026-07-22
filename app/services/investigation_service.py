@@ -270,18 +270,6 @@ class InvestigationService:
             duration = time.time() - reasoner_started
 
             print(
-                f"⚠️ AI Reasoner API failed after {duration:.2f} seconds"
-            )
-            print(type(ex).__name__)
-            print(ex)
-
-            raise
-
-        except Exception as ex:
-
-            duration = time.time() - reasoner_started
-
-            print(
                 f"❌ AI Reasoner failed after {duration:.2f} seconds"
             )
             print(type(ex).__name__)

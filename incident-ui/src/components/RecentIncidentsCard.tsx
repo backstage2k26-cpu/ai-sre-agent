@@ -25,6 +25,21 @@ interface Props {
   incidents: Incident[];
 }
 
+function priorityLabel(priority: string): string {
+  return `P${priority}`;
+}
+
+function priorityTone(priority: string) {
+  const val = priority.toString();
+  if (val === "1" || val === "P1") {
+    return { bgcolor: "#FEF2F2", color: "#EF4444" };
+  }
+  if (val === "2" || val === "P2") {
+    return { bgcolor: "#FFFBEB", color: "#D97706" };
+  }
+  return { bgcolor: "#F3F4F6", color: "#6B7280" };
+}
+
 export default function RecentIncidentsCard({
   incidents,
 }: Props) {
@@ -176,23 +191,12 @@ export default function RecentIncidentsCard({
                     </TableCell>
                     <TableCell>
                       <Chip
-                        label={incident.priority}
+                        label={priorityLabel(incident.priority)}
                         size="small"
                         sx={{
                           fontWeight: 800,
                           borderRadius: 999,
-                          bgcolor:
-                            incident.priority === "1" || incident.priority === "P1"
-                              ? "#FEF2F2"
-                              : incident.priority === "2" || incident.priority === "P2"
-                                ? "#FFFBEB"
-                                : "#F3F4F6",
-                          color:
-                            incident.priority === "1" || incident.priority === "P1"
-                              ? "#EF4444"
-                              : incident.priority === "2" || incident.priority === "P2"
-                                ? "#D97706"
-                                : "#6B7280",
+                          ...priorityTone(incident.priority),
                         }}
                       />
                     </TableCell>
