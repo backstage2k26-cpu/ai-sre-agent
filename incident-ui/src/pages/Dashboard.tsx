@@ -107,16 +107,34 @@ function sectionTitle({
   eyebrow,
   title,
   subtitle,
+  compact = false,
 }: {
   eyebrow?: string;
   title: string;
   subtitle?: string;
+  compact?: boolean;
 }) {
   return (
     <Box>
-      {eyebrow && <Typography className="dashboard-eyebrow">{eyebrow}</Typography>}
-      <Typography className="dashboard-title">{title}</Typography>
-      {subtitle && <Typography className="dashboard-subtitle">{subtitle}</Typography>}
+      {eyebrow && (
+        <Typography className="dashboard-eyebrow">
+          {eyebrow}
+        </Typography>
+      )}
+
+      <Typography
+        className={
+          compact ? "dashboard-panel-title" : "dashboard-title"
+        }
+      >
+        {title}
+      </Typography>
+
+      {subtitle && (
+        <Typography className="dashboard-subtitle">
+          {subtitle}
+        </Typography>
+      )}
     </Box>
   );
 }
@@ -187,9 +205,9 @@ export default function Dashboard() {
 
     return [
       { title: "Total Incidents", value: totalIncidents, tone: "indigo" as const, icon: "clipboard" as const, delta: "+4.2%", deltaTone: "red" as const },
-      { title: "Open Incidents", value: openIncidents, tone: "green" as const, icon: "flag" as const, delta: "-6", deltaTone: "green" as const },
-      { title: "Investigating", value: investigating, tone: "red" as const, icon: "close" as const, delta: "+3", deltaTone: "red" as const },
-      { title: "Resolved Today", value: resolvedToday, tone: "green" as const, icon: "check" as const, delta: "+11%", deltaTone: "green" as const },
+      { title: "Ai Resolved", value: openIncidents, tone: "green" as const, icon: "flag" as const, delta: "-6", deltaTone: "green" as const },
+      { title: "Failed Investigations", value: investigating, tone: "red" as const, icon: "close" as const, delta: "+3", deltaTone: "red" as const },
+      { title: "High Priority", value: resolvedToday, tone: "green" as const, icon: "check" as const, delta: "+11%", deltaTone: "green" as const },
       { title: "Avg Investigation Time", value: avgTime, tone: "violet" as const, icon: "clock" as const, delta: "-38s", deltaTone: "green" as const },
       { title: "AI Confidence Avg", value: confidence, tone: "blue" as const, icon: "pulse" as const, delta: "+2.1%", deltaTone: "green" as const },
     ];
@@ -308,9 +326,13 @@ export default function Dashboard() {
         </Box>
 
         <Box className="dashboard-grid dashboard-grid-top">
-          <Panel className="dashboard-wide-panel">
+          <Panel className="dashboard-chart-panel">
             <Box className="dashboard-panel-header">
-              {sectionTitle({ title: "Incident Trend", subtitle: "Last 7 days" })}
+              {sectionTitle({
+                title: "Incident Trend",
+                subtitle: "Last 7 days",
+                compact: true,
+              })}
               <Box className="dashboard-legend">
                 <Box className="legend-item">
                   <Box className="legend-dot legend-created" />
@@ -363,40 +385,119 @@ export default function Dashboard() {
             </Box>
           </Panel>
 
-          <Panel className="dashboard-side-panel">
-            {sectionTitle({ title: "Incidents by Priority", subtitle: "Currently open" })}
-            <Box className="donut-wrap">
-              <Box
-                className="donut-chart"
-                style={{
-                  background: `conic-gradient(
-                    #ef4444 0 ${priorityCounts[0]?.value ?? 0}%,
-                    #eab308 ${priorityCounts[0]?.value ?? 0}% ${((priorityCounts[0]?.value ?? 0) + (priorityCounts[1]?.value ?? 0))}%,
-                    #0284c7 ${((priorityCounts[0]?.value ?? 0) + (priorityCounts[1]?.value ?? 0))}% ${((priorityCounts[0]?.value ?? 0) + (priorityCounts[1]?.value ?? 0) + (priorityCounts[2]?.value ?? 0))}%,
-                    #16a34a ${((priorityCounts[0]?.value ?? 0) + (priorityCounts[1]?.value ?? 0) + (priorityCounts[2]?.value ?? 0))}% 100%
-                  )`,
-                }}
-              />
-              <Box className="donut-hole" />
-            </Box>
+          <Panel className="dashboard-chart-panel">
+            {sectionTitle({
+              title: "Incidents by Priority",
+              subtitle: "Currently open",
+              compact: true,
+            })}
+            <Box
+              className="donut-wrap"
+              sx={{
+                mt: 2,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 3,
+                height: 220,          // instead of filling the whole panel
+                flex: "0 0 auto",     // don't stretch
+              }}
+            >
+              {(() => {
+                const total = priorityCounts.reduce((sum, p) => sum + p.value, 0);
 
-            <Box className="priority-list">
-              {priorityCounts.map((item) => (
-                <Box key={item.label} className="priority-item">
-                  <Box className="priority-label">
-                    <Box className="priority-dot" sx={{ backgroundColor: item.color }} />
-                    <Typography>{item.label}</Typography>
-                  </Box>
-                  <Typography className="priority-value">{item.value}</Typography>
-                </Box>
-              ))}
+                const critical =
+                  total === 0 ? 0 : (priorityCounts[0]?.value / total) * 100;
+
+                const high =
+                  total === 0 ? 0 : (priorityCounts[1]?.value / total) * 100;
+
+                const medium =
+                  total === 0 ? 0 : (priorityCounts[2]?.value / total) * 100;
+
+                const low =
+                  total === 0 ? 0 : (priorityCounts[3]?.value / total) * 100;
+
+                return (
+                  <>
+                    <Box
+                      className="donut-chart"
+                      sx={{
+                        background: `conic-gradient(
+                          #ef4444 0 ${critical}%,
+                          #eab308 ${critical}% ${critical + high}%,
+                          #0284c7 ${critical + high}% ${
+                          critical + high + medium
+                        }%,
+                          #16a34a ${critical + high + medium}% 100%
+                        )`,
+                      }}
+                    >
+                      <Box className="donut-hole" />
+                    </Box>
+
+                    <Box className="priority-legend">
+                      {priorityCounts.map((item) => (
+                        <Box
+                          key={item.label}
+                          sx={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            py: 0.35,
+                            minHeight: 30,
+                          }}
+                        >
+                          <Box
+                            sx={{
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 1,
+                            }}
+                          >
+                            <Box
+                              sx={{
+                                width: 10,
+                                height: 10,
+                                borderRadius: "50%",
+                                bgcolor: item.color,
+                              }}
+                            />
+
+                            <Typography
+                              sx={{
+                                fontSize: 14,
+                                fontWeight: 500,
+                              }}
+                            >
+                              {item.label}
+                            </Typography>
+                          </Box>
+
+                          <Typography
+                            sx={{
+                              color: "#667085",
+                              fontWeight: 600,
+                            }}
+                          >
+                            {item.value}
+                          </Typography>
+                        </Box>
+                      ))}
+                    </Box>
+                  </>
+                );
+              })()}
             </Box>
           </Panel>
         </Box>
       </Box>
 
       <Box className="dashboard-section">
-        <Box className="dashboard-grid dashboard-grid-three">
+        <Box
+          className="dashboard-grid dashboard-grid-three"
+          sx={{ mt: 1 }}
+        >
           <Panel>
             <Typography className="card-heading">Most Affected Applications</Typography>
             <Box className="app-list">

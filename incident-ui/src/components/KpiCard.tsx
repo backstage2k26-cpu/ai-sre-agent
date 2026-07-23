@@ -19,13 +19,13 @@ export default function KpiCard({
   return (
     <Box
       sx={{
-        height: 112,
-        borderRadius: "16px",
+        height: 100,
+        borderRadius: "14px",
         bgcolor: "#fff",
         border: "1px solid #E5E7EB",
         boxShadow: "0 1px 6px rgba(15,23,42,.05)",
-        px: 2,
-        py: 1.6,
+        px: 1.8,
+        py: 1.4,
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
@@ -33,7 +33,7 @@ export default function KpiCard({
     >
       <Typography
         sx={{
-          fontSize: 12,
+          fontSize: 11,
           fontWeight: 700,
           color: "#6B7280",
           textTransform: "uppercase",
@@ -46,11 +46,11 @@ export default function KpiCard({
 
       <Typography
         sx={{
-          fontSize: 24,
+          fontSize: 22,
           fontWeight: 800,
           color: "#111827",
           lineHeight: 1,
-          mt: 0.5,
+          mt: 0.3,
         }}
       >
         {value}
@@ -61,8 +61,8 @@ export default function KpiCard({
           sx={{
             display: "flex",
             alignItems: "center",
-            gap: .4,
-            fontSize: 13,
+            gap: .3,
+            fontSize: 12,
             fontWeight: 700,
             color: trendColor,
           }}
@@ -72,7 +72,7 @@ export default function KpiCard({
 
           <Typography
             sx={{
-              fontSize: 13,
+              fontSize: 12,
               color: "#6B7280",
             }}
           >
