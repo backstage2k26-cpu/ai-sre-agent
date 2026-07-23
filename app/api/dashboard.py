@@ -72,16 +72,32 @@ def get_recent_incidents(
     db: Session = Depends(get_db),
 ):
     repo = IncidentRepository(db)
+    investigation_repo = InvestigationRepository(db)
 
     incidents = repo.list_recent(5)
 
-    return [
-        {
-            "number": incident.number,
-            "short_description": incident.short_description,
-            "priority": incident.priority,
-            "state": incident.state,
-            "opened_at": incident.opened_at,
-        }
-        for incident in incidents
-    ]
+    recent = []
+
+    for incident in incidents:
+        latest = investigation_repo.get_latest_by_incident(
+            incident.number
+        )
+
+        recent.append(
+            {
+                "number": incident.number,
+                "short_description": incident.short_description,
+                "priority": incident.priority,
+                "state": incident.state,
+                "opened_at": incident.opened_at,
+                "service": incident.service,
+                "investigation_status": (
+                    latest.status if latest else None
+                ),
+                "investigation_id": (
+                    latest.investigation_id if latest else None
+                ),
+            }
+        )
+
+    return recent
