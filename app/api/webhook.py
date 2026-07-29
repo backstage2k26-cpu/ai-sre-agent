@@ -22,10 +22,27 @@ async def servicenow_webhook(
     manager: InvestigationManager = Depends(get_investigation_manager),
 ):
     try:
-        request = ServiceNowMapper.to_investigation_request(payload)
-        incident_repo = IncidentRepository(db)
 
+        if payload.event_type != "incident.created":
+            return {
+                "status": "ignored",
+                "reason": payload.event_type,
+            }
+
+        request = ServiceNowMapper.to_investigation_request(payload)
+
+        incident_repo = IncidentRepository(db)
         incident_repo.create_or_update(request.incident)
+
+        existing = incident_repo.get_active_investigation(
+            request.incident.incident_id
+        )
+
+        if existing:
+            return {
+                "status": "ignored",
+                "reason": "Investigation already running",
+            }
 
         await manager.submit_incident(request)
 

@@ -327,6 +327,31 @@ class InvestigationService:
         completed_at = datetime.now(UTC)
         started_at_dt = datetime.fromtimestamp(started_at, UTC)
         print("\n========== 13. REPORT ==========")
+        # ----------------------------------------------------
+        # Normalize application / environment
+        # ----------------------------------------------------
+
+        import re
+
+        namespace = summary.context.namespace or ""
+        application = summary.context.application_name or namespace
+        environment = "Unknown"
+
+        match = re.match(
+            r"^(.*?)-(dev|qa|uat|prod|stage)$",
+            namespace,
+            re.IGNORECASE,
+        )
+
+        if match:
+            application = match.group(1)
+            environment = match.group(2)
+
+        print("================================")
+        print("Namespace   :", namespace)
+        print("Application :", application)
+        print("Environment :", environment)
+        print("================================")
 
         summary.report = {
             "executive_summary": {
@@ -358,14 +383,19 @@ class InvestigationService:
                 "eyebrow": "AI INVESTIGATION REPORT",
                 "short_description": incident.short_description,
                 "description": incident.description,
-                "application": summary.context.application_name,
-                "environment": summary.context.namespace,
+
+                "application": application,
+                "environment": environment,
+                "location": getattr(summary.context, "location", ""),
+
                 "confidence": summary.ai_result.confidence,
                 "duration": summary.investigation_result.investigation_time,
                 "components": 14,
                 "eta": summary.ai_result.estimated_recovery_time,
                 "generated_at": completed_at.isoformat(),
+
                 "version": f"{settings.app_name} {settings.app_env}",
+
                 "cause": summary.ai_result.root_cause.title,
                 "how": summary.ai_result.root_cause.description,
             },
@@ -482,8 +512,11 @@ class InvestigationService:
                 "description": incident.description,
                 "priority": context.priority,
                 "state": incident.state,
-                "application": summary.context.application_name,
+
+                "application": application,
+                "environment": environment,
                 "namespace": summary.context.namespace,
+
                 "started_at": started_at_dt.isoformat(),
                 "completed_at": completed_at.isoformat(),
                 "duration_seconds": summary.investigation_result.investigation_time,

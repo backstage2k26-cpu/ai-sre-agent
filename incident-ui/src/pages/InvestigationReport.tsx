@@ -8,11 +8,16 @@ import {
   Divider,
   Paper,
   Typography,
+  Grid,
+  Stack,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
 import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
 import BoltRoundedIcon from "@mui/icons-material/BoltRounded";
+import AppsIcon from "@mui/icons-material/Apps";
+import DnsOutlinedIcon from "@mui/icons-material/DnsOutlined";
+import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
 
 import { getInvestigation } from "../services/investigationService";
 const API = "http://localhost:8000";
@@ -104,6 +109,7 @@ export default function InvestigationReport() {
   }, [job]);
 
   const data = useMemo(() => buildData(job, report, incidentPayload), [job, report, incidentPayload]);
+  const isFailed = data.reportState === "failed";
 
   if (loading) {
     return (
@@ -126,36 +132,102 @@ export default function InvestigationReport() {
       <Container maxWidth={false} sx={{ px: { xs: 2, md: 3 }, py: 2.5 }}>
         <TopBar navigate={navigate} />
 
-        <Hero data={data} />
+        {isFailed ? <FailureHero data={data} /> : <Hero data={data} />}
 
-        <SectionHeader step="01" tag="ANSWER FIRST" title="Executive Summary" subtitle="What happened, why, and what to do next." />
-        <ExecutiveSummarySection data={data} />
+        {isFailed ? (
+          <>
+            <SectionHeader
+              step="01"
+              tag="INVESTIGATION"
+              title="Investigation Progress"
+              subtitle="Shows exactly where the AI investigation stopped."
+            />
 
-        <SectionHeader step="02" tag="HOW THE AGENT THINKS" title="AI Investigation" subtitle="Reasoning chain, evidence weights, and alternative hypotheses the agent considered and ruled out." />
-        <AIInvestigationSection data={data} />
+            <FailureFindingsSection data={data} />
 
-        <SectionHeader step="03" tag="COMPONENT-BY-COMPONENT" title="Technical Investigation" subtitle="Subsystems inspected in parallel." />
-        <TechnicalInvestigationSection data={data} />
+            <SectionHeader
+              step="02"
+              tag="MISSING DATA"
+              title="Missing Investigation Resources"
+              subtitle="Resources that could not be investigated because execution stopped."
+            />
 
-        <SectionHeader step="04" tag="SYSTEM TOPOLOGY" title="Infrastructure Health Map" subtitle="11 of 12 systems investigated. Skipped systems were healthy at query time." />
-        <InfrastructureSection data={data} />
+            <FailureRecoverySection data={data} />
 
-        <SectionHeader step="05" tag="SHOW YOUR WORK" title="Evidence Explorer" subtitle="Raw signals grouped by component. Every conclusion is traceable." />
-        <EvidenceExplorerSection data={data} />
+            <SectionHeader
+              step="03"
+              tag="LOG ANALYSIS"
+              title="Loki Logs"
+              subtitle="Application logs collected before the investigation terminated."
+            />
 
-        <SectionHeader step="06" tag="CHRONOLOGY" title="Investigation Timeline" subtitle="Every signal, action, and inference in order." />
-        <TimelineSection data={data} />
+            <FailureLokiLogsSection data={data} />
 
-        <SectionHeader step="07" tag="FIX NOW" title="Recovery Actions" subtitle="Prioritized, runnable steps to restore service." />
-        <RecoveryActionsSection data={data} />
+            <SectionHeader
+              step="04"
+              tag="EXECUTION"
+              title="Agent Execution Log"
+              subtitle="Internal execution log of the investigation agent."
+            />
 
-        <SectionHeader step="08" tag="PREVENT THE NEXT ONE" title="Recommendations" subtitle="Immediate, preventive, and long-term work broken out for planning." />
-        <RecommendationsSection data={data} />
+            <FailureAgentLogSection data={data} />
+          </>
+        ) : (
+          <>
+            <SectionHeader
+              step="01"
+              tag="ANSWER FIRST"
+              title="Executive Summary"
+              subtitle="What happened, why, and what to do next."
+            />
 
-        <SectionHeader step="09" tag="PATTERN INTELLIGENCE" title="Similar Incidents" subtitle="Historical incidents with matching signatures, ranked by similarity." />
-        <SimilarIncidentsSection data={data} />
+            <ExecutiveSummarySection data={data} />
 
-        <FooterSection data={data} />
+            <SectionHeader
+              step="02"
+              tag="NEXT STEPS"
+              title="AI Investigation"
+              subtitle="Reasoning chain, evidence weights and conclusions."
+            />
+
+            <AIInvestigationSection data={data} />
+
+            <SectionHeader
+              step="03"
+              tag="DIAGNOSTIC TRAIL"
+              title="Technical Investigation"
+              subtitle="Subsystems inspected in parallel."
+            />
+
+            <TechnicalInvestigationSection data={data} />
+
+            {/* keep remaining success sections unchanged */}
+          </>
+        )}
+
+        {!isFailed && (
+          <>
+            <SectionHeader step="04" tag="SYSTEM TOPOLOGY" title="Infrastructure Health Map" subtitle="11 of 12 systems investigated. Skipped systems were healthy at query time." />
+            <InfrastructureSection data={data} />
+
+            <SectionHeader step="05" tag="SHOW YOUR WORK" title="Evidence Explorer" subtitle="Raw signals grouped by component. Every conclusion is traceable." />
+            <EvidenceExplorerSection data={data} />
+
+            <SectionHeader step="06" tag="CHRONOLOGY" title="Investigation Timeline" subtitle="Every signal, action, and inference in order." />
+            <TimelineSection data={data} />
+
+            <SectionHeader step="07" tag="FIX NOW" title="Recovery Actions" subtitle="Prioritized, runnable steps to restore service." />
+            <RecoveryActionsSection data={data} />
+
+            <SectionHeader step="08" tag="PREVENT THE NEXT ONE" title="Recommendations" subtitle="Immediate, preventive, and long-term work broken out for planning." />
+            <RecommendationsSection data={data} />
+
+            <SectionHeader step="09" tag="PATTERN INTELLIGENCE" title="Similar Incidents" subtitle="Historical incidents with matching signatures, ranked by similarity." />
+            <SimilarIncidentsSection data={data} />
+          </>
+        )}
+
+        {!isFailed && <FooterSection data={data} />}
       </Container>
     </Box>
   );
@@ -167,51 +239,69 @@ function TopBar({ navigate }: { navigate: (path: string) => void }) {
       <Button startIcon={<ArrowBackIcon />} onClick={() => navigate("/incidents")} sx={{ textTransform: "none", color: "#334155", fontWeight: 700 }}>
         Incidents
       </Button>
-      <Box sx={{ display: "flex", gap: 1.2, flexWrap: "wrap" }}>
-        <ActionButton icon={<ShareOutlinedIcon />} label="Share" />
-        <ActionButton icon={<PictureAsPdfOutlinedIcon />} label="Export PDF" />
-        <Button variant="contained" startIcon={<BoltRoundedIcon />} sx={primaryBtnSx}>
-          Run Recovery
-        </Button>
       </Box>
-    </Box>
   );
 }
 
 function Hero({ data }: { data: AnyObj }) {
   return (
-    <Paper sx={{ p: { xs: 2.5, md: 3.5 }, borderRadius: 4, background: "linear-gradient(135deg, #1F3358 0%, #344a72 100%)", color: "#fff", boxShadow: "0 18px 42px rgba(15,23,42,0.18)" }}>
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 320px" }, gap: 3 }}>
+    <Paper sx={{ p: { xs: 1.75, md: 2.1 }, borderRadius: 4, background: "linear-gradient(135deg, #1F3358 0%, #344a72 100%)", color: "#fff", boxShadow: "0 18px 42px rgba(15,23,42,0.18)" }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 280px" }, gap: 1.75 }}>
         <Box>
-          <Typography sx={eyebrowSx}>AI INVESTIGATION REPORT · AI SRE AGENT V4.2.1</Typography>
-          <Typography sx={{ mt: 1, fontSize: { xs: 30, md: 42 }, lineHeight: 1.05, fontWeight: 800, letterSpacing: "-0.05em" }}>
+          <Typography sx={{ ...eyebrowSx, fontSize: 10.5 }}>
+            AI INVESTIGATION REPORT · AI SRE AGENT V4.2.1
+          </Typography>
+          <Typography sx={{ mt: 0.55, fontSize: { xs: 23, md: 28 }, lineHeight: 1.02, fontWeight: 800, letterSpacing: "-0.05em" }}>
             {data.heroShortDescription || "Short description not available"}
           </Typography>
-          <Typography sx={{ mt: 1.2, color: "rgba(255,255,255,0.82)", fontSize: { xs: 14, md: 15 }, lineHeight: 1.55, maxWidth: 900 }}>
+          <Typography sx={{ mt: 0.65, color: "rgba(255,255,255,0.82)", fontSize: { xs: 12, md: 13 }, lineHeight: 1.35, maxWidth: 900 }}>
             {data.heroDescription || "Description not available"}
           </Typography>
-          <Divider sx={{ my: 2.3, borderColor: "rgba(255,255,255,0.12)" }} />
-          <Typography sx={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", color: "rgba(255,255,255,0.62)" }}>
+          <Divider sx={{ my: 1.3, borderColor: "rgba(255,255,255,0.12)" }} />
+          <Typography sx={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.08em", color: "rgba(255,255,255,0.62)" }}>
             WHAT CAUSED THE ISSUE
           </Typography>
-          <Typography sx={{ mt: 0.6, color: "rgba(255,255,255,0.92)", fontSize: { xs: 15, md: 16 }, lineHeight: 1.55 }}>
+          <Typography sx={{ mt: 0.3, color: "rgba(255,255,255,0.92)", fontSize: { xs: 12.5, md: 13.5 }, lineHeight: 1.32 }}>
             {data.heroCause || "No dynamic data available"}
           </Typography>
-          <Typography sx={{ mt: 1.8, fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", color: "rgba(255,255,255,0.62)" }}>
+          <Typography sx={{ mt: 0.85, fontSize: 10.5, fontWeight: 800, letterSpacing: "0.08em", color: "rgba(255,255,255,0.62)" }}>
             HOW IT HAPPENED
           </Typography>
-          <Typography sx={{ mt: 0.6, color: "rgba(255,255,255,0.92)", fontSize: { xs: 15, md: 16 }, lineHeight: 1.55 }}>
+          <Typography sx={{ mt: 0.3, color: "rgba(255,255,255,0.92)", fontSize: { xs: 12.5, md: 13.5 }, lineHeight: 1.32 }}>
             {data.heroHow || "No dynamic data available"}
           </Typography>
-          <Divider sx={{ my: 2.3, borderColor: "rgba(255,255,255,0.12)" }} />
-          <Box sx={{ display: "flex", gap: 2, flexWrap: "wrap", color: "rgba(255,255,255,0.72)", fontSize: 13 }}>
-            <MetaPill>{data.heroApp}</MetaPill>
-            <MetaPill>{data.heroEnv}</MetaPill>
-            <MetaPill>{data.heroGeneratedAt}</MetaPill>
-            <MetaPill>{data.heroVersion}</MetaPill>
+          <Divider sx={{ my: 1.3, borderColor: "rgba(255,255,255,0.12)" }} />
+          <Box
+            sx={{
+              mt: 1,
+              pt: 1,
+              borderTop: "1px solid rgba(255,255,255,0.12)",
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 2,
+              color: "rgba(255,255,255,0.72)",
+              fontSize: 12,
+              alignItems: "center",
+            }}
+          >
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <AppsIcon sx={{ fontSize: 15, opacity: 0.8 }} />
+              {data.heroApp}
+            </Box>
+
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <DnsOutlinedIcon sx={{ fontSize: 15, opacity: 0.8 }} />
+              {data.heroEnv}
+              {data.heroLocation && ` • ${data.heroLocation}`}
+            </Box>
+
+            <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+              <AccessTimeOutlinedIcon sx={{ fontSize: 15, opacity: 0.8 }} />
+              Generated {data.heroGeneratedAt}
+            </Box>
           </Box>
         </Box>
-        <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.5 }}>
+        <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.1 }}>
           <HeroStat label="CONFIDENCE" value={data.heroConfidence == null ? "-" : `${data.heroConfidence}%`} />
           <HeroStat label="INVESTIGATION" value={data.heroDuration || "-"} />
           <HeroStat label="COMPONENTS" value={data.heroComponents} />
@@ -236,15 +326,15 @@ function SectionHeader({
   return (
     <Box sx={{ mt: 4.5 }}>
       <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
-        <Chip label={step} size="small" sx={{ fontWeight: 800 }} />
-        <Typography sx={{ fontSize: 13, letterSpacing: "0.08em", color: "#64748B", fontWeight: 700 }}>
+        <Chip label={step} size="small" sx={{ fontWeight: 800, height: 26, "& .MuiChip-label": { px: 1 } }} />
+        <Typography sx={{ fontSize: 10.5, letterSpacing: "0.08em", color: "#64748B", fontWeight: 700 }}>
           {tag}
         </Typography>
       </Box>
-      <Typography sx={{ mt: 0.8, fontSize: { xs: 26, md: 32 }, lineHeight: 1.08, fontWeight: 800, letterSpacing: "-0.04em", color: "#111827" }}>
+      <Typography sx={{ mt: 0.5, fontSize: { xs: 18, md: 22 }, lineHeight: 1.06, fontWeight: 800, letterSpacing: "-0.04em", color: "#111827" }}>
         {title}
       </Typography>
-      <Typography sx={{ mt: 0.8, color: "#6B7280", fontSize: 15, lineHeight: 1.4 }}>
+      <Typography sx={{ mt: 0.35, color: "#6B7280", fontSize: 11.5, lineHeight: 1.25 }}>
         {subtitle}
       </Typography>
     </Box>
@@ -253,26 +343,26 @@ function SectionHeader({
 
 function ExecutiveSummarySection({ data }: { data: AnyObj }) {
   return (
-    <Paper sx={{ mt: 2, p: 3, borderRadius: 4 }}>
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.5fr 1fr" }, gap: 2 }}>
+    <Paper sx={{ mt: 2, p: { xs: 2, md: 2.25 }, borderRadius: 4 }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.45fr 1fr" }, gap: 1.5 }}>
         <SectionCard title="ROOT CAUSE" accent="red" large>
           {data.executiveRootCause}
         </SectionCard>
         <SectionCard title="CONFIDENCE">
           <Box>
-            <Typography sx={{ fontSize: 54, fontWeight: 800, lineHeight: 1, color: "#1E3A8A" }}>
+            <Typography sx={{ fontSize: { xs: 44, md: 48 }, fontWeight: 800, lineHeight: 1, color: "#1E3A8A" }}>
               {data.heroConfidence == null ? "-" : data.heroConfidence}
-              <Typography component="span" sx={{ fontSize: 24, color: "#94A3B8" }}>
+              <Typography component="span" sx={{ fontSize: 18, color: "#94A3B8" }}>
                 %
               </Typography>
             </Typography>
-            <Box sx={{ mt: 1.5, height: 10, borderRadius: 999, bgcolor: "#E5E7EB", overflow: "hidden" }}>
+            <Box sx={{ mt: 1.25, height: 8, borderRadius: 999, bgcolor: "#E5E7EB", overflow: "hidden" }}>
               <Box sx={{ width: `${data.heroConfidence == null ? 0 : data.heroConfidence}%`, height: "100%", bgcolor: "#1E3A8A" }} />
             </Box>
-            <Typography sx={{ mt: 1.2, color: "#6B7280", fontSize: 14 }}>
+            <Typography sx={{ mt: 1, color: "#6B7280", fontSize: 12.5, lineHeight: 1.35 }}>
               High confidence - evidence is deterministic and reproducible.
             </Typography>
-            <Box sx={{ mt: 2.5, display: "grid", gap: 1 }}>
+            <Box sx={{ mt: 1.5, display: "grid", gap: 0.75 }}>
               <DetailLine label="Severity" value={data.severity} />
               <DetailLine label="Owner" value={data.owner} />
               <DetailLine label="Risk" value={data.risk} />
@@ -281,7 +371,7 @@ function ExecutiveSummarySection({ data }: { data: AnyObj }) {
         </SectionCard>
       </Box>
 
-      <Box sx={{ mt: 2, display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 2 }}>
+      <Box sx={{ mt: 1.5, display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 1.5 }}>
         <SectionCard title="BUSINESS IMPACT">{data.businessImpact}</SectionCard>
         <SectionCard title="CURRENT STATUS">{data.currentStatus}</SectionCard>
       </Box>
@@ -291,28 +381,28 @@ function ExecutiveSummarySection({ data }: { data: AnyObj }) {
 
 function AIInvestigationSection({ data }: { data: AnyObj }) {
   return (
-    <Box sx={{ mt: 2, display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.6fr 1fr" }, gap: 2 }}>
-      <Paper sx={{ p: 2.5, borderRadius: 4 }}>
-        <Typography sx={panelHeadingSx}>Reasoning Chain</Typography>
-        <Typography sx={panelSubSx}>Sequential steps from signal ingest to root cause</Typography>
-        <Box sx={{ mt: 2 }}>
+    <Box sx={{ mt: 2, display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.55fr 1fr" }, gap: 1.5 }}>
+      <Paper sx={{ p: 1.75, borderRadius: 4 }}>
+        <Typography sx={{ ...panelHeadingSx, fontSize: 11 }}>Reasoning Chain</Typography>
+        <Typography sx={{ ...panelSubSx, fontSize: 12 }}>Sequential steps from signal ingest to root cause</Typography>
+        <Box sx={{ mt: 1.5 }}>
           {(data.reasoning || []).slice(0, 6).map((item: AnyObj | string, index: number) => (
-            <Box key={index} sx={{ display: "grid", gridTemplateColumns: "28px 1fr", gap: 1.5, mb: 2.2 }}>
+            <Box key={index} sx={{ display: "grid", gridTemplateColumns: "24px 1fr", gap: 1.25, mb: 1.6 }}>
               <StepCircle>{index + 1}</StepCircle>
               <Box>
-                <Typography sx={{ fontWeight: 700, color: "#111827" }}>
+                <Typography sx={{ fontWeight: 700, color: "#111827", fontSize: 13 }}>
                   {typeof item === "string" ? item : item.title || item.label || item.summary || "Reasoning step"}
                 </Typography>
-                <Typography sx={{ color: "#6B7280", lineHeight: 1.45, mt: 0.2 }}>
+                <Typography sx={{ color: "#6B7280", lineHeight: 1.35, mt: 0.1, fontSize: 12.5 }}>
                   {typeof item === "string" ? "" : item.detail || item.summary || item.description || ""}
                 </Typography>
               </Box>
             </Box>
           ))}
         </Box>
-        <Paper sx={{ mt: 2.5, p: 2, borderRadius: 3, bgcolor: "#FAFBFC" }}>
-          <Typography sx={panelHeadingSx}>Why we're confident</Typography>
-          <Box sx={{ mt: 1.5, display: "grid", gap: 1.1 }}>
+        <Paper sx={{ mt: 1.75, p: 1.5, borderRadius: 3, bgcolor: "#FAFBFC" }}>
+          <Typography sx={{ ...panelHeadingSx, fontSize: 11 }}>Why we're confident</Typography>
+          <Box sx={{ mt: 1, display: "grid", gap: 0.85 }}>
             {(data.confidenceReasons || []).map((item: string, index: number) => (
               <Bullet key={index}>{item}</Bullet>
             ))}
@@ -320,28 +410,28 @@ function AIInvestigationSection({ data }: { data: AnyObj }) {
         </Paper>
       </Paper>
 
-      <Box sx={{ display: "grid", gap: 2 }}>
-        <Paper sx={{ p: 2.5, borderRadius: 4 }}>
-          <Typography sx={panelHeadingSx}>Failure Point</Typography>
-          <Box sx={{ mt: 1.5, p: 2, borderRadius: 3, bgcolor: "#F3F4F6", fontFamily: "monospace", fontSize: 14, color: "#111827" }}>
+      <Box sx={{ display: "grid", gap: 1.5 }}>
+        <Paper sx={{ p: 1.75, borderRadius: 4 }}>
+          <Typography sx={{ ...panelHeadingSx, fontSize: 11 }}>Failure Point</Typography>
+          <Box sx={{ mt: 1.1, p: 1.5, borderRadius: 3, bgcolor: "#F3F4F6", fontFamily: "monospace", fontSize: 12.5, color: "#111827" }}>
             {data.failurePoint}
           </Box>
         </Paper>
-        <Paper sx={{ p: 2.5, borderRadius: 4 }}>
-          <Typography sx={panelHeadingSx}>Primary Evidence</Typography>
-          <Box sx={{ mt: 1.5, display: "grid", gap: 1 }}>
+        <Paper sx={{ p: 1.75, borderRadius: 4 }}>
+          <Typography sx={{ ...panelHeadingSx, fontSize: 11 }}>Primary Evidence</Typography>
+          <Box sx={{ mt: 1, display: "grid", gap: 0.8 }}>
             {(data.primaryEvidence || []).map((item: string, index: number) => (
               <Bullet key={index}>{item}</Bullet>
             ))}
           </Box>
         </Paper>
-        <Paper sx={{ p: 2.5, borderRadius: 4 }}>
-          <Typography sx={panelHeadingSx}>Alternatives Ruled Out</Typography>
-          <Box sx={{ mt: 1.5, display: "grid", gap: 1.1 }}>
+        <Paper sx={{ p: 1.75, borderRadius: 4 }}>
+          <Typography sx={{ ...panelHeadingSx, fontSize: 11 }}>Alternatives Ruled Out</Typography>
+          <Box sx={{ mt: 1, display: "grid", gap: 0.85 }}>
             {(data.alternatives || []).map((item: AnyObj, index: number) => (
               <Box key={index} sx={{ borderLeft: "2px solid #E5E7EB", pl: 1.6 }}>
-                <Typography sx={{ fontWeight: 700, color: "#111827", fontSize: 14 }}>{item.title || item}</Typography>
-                <Typography sx={{ color: "#6B7280", fontSize: 13.5, mt: 0.3 }}>{item.reason || ""}</Typography>
+                <Typography sx={{ fontWeight: 700, color: "#111827", fontSize: 13 }}>{item.title || item}</Typography>
+                <Typography sx={{ color: "#6B7280", fontSize: 12.5, mt: 0.2 }}>{item.reason || ""}</Typography>
               </Box>
             ))}
           </Box>
@@ -393,7 +483,7 @@ function TechnicalInvestigationSection({ data }: { data: AnyObj }) {
 
   return (
     <Box sx={{ mt: 2 }}>
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(4, 1fr)" }, gap: 1.8 }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(4, 1fr)" }, gap: 1.4 }}>
         {cards.map((card: AnyObj, index: number) => (
           <InvestigationCard
             key={index}
@@ -425,8 +515,8 @@ function InfrastructureSection({ data }: { data: AnyObj }) {
   ];
 
   return (
-    <Paper sx={{ mt: 2, p: 2.5, borderRadius: 4 }}>
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(4, 1fr)" }, gap: 1.5 }}>
+    <Paper sx={{ mt: 2, p: 1.5, borderRadius: 4 }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(4, 1fr)" }, gap: 1.2 }}>
         {tiles.map((item: AnyObj, index: number) => (
           <TopologyTile
             key={index}
@@ -472,7 +562,7 @@ function EvidenceExplorerSection({ data }: { data: AnyObj }) {
 
 function TimelineSection({ data }: { data: AnyObj }) {
   return (
-    <Paper sx={{ mt: 2, p: 2.5, borderRadius: 4 }}>
+    <Paper sx={{ mt: 2, p: 2, borderRadius: 4 }}>
       <Box sx={{ display: "grid", gap: 2.2 }}>
         {(data.timeline || []).slice(0, 6).map((item: AnyObj, index: number) => (
           <Box key={index} sx={{ display: "grid", gridTemplateColumns: "88px 1fr", gap: 2 }}>
@@ -613,6 +703,8 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
     "-";
   const aiResult = job?.ai_result ?? {};
   const investigationResult = job?.investigation_result ?? {};
+  const reportState = job?.status?.toString?.().toLowerCase?.() ?? "unknown";
+  const isFailed = reportState === "failed" || (!report && !!job && reportState !== "completed");
   const rootCause =
     report?.ai_investigation?.root_cause?.description ??
     latestAi?.ai_investigation?.root_cause?.description ??
@@ -638,6 +730,41 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
   const investigationTime = report?.hero?.duration ?? latestAi?.hero?.duration ?? investigationResult?.investigation_time ?? aiResult?.estimated_recovery_time ?? null;
   console.log("FULL REPORT", report);
 
+  const failureReason = job?.error ?? job?.current_step ?? report?.ai_investigation?.failure_point ?? latestAi?.ai_investigation?.failure_point ?? null;
+  const failureSummary =
+    report?.ai_investigation?.failure_summary ??
+    latestAi?.ai_investigation?.failure_summary ??
+    job?.error ??
+    job?.current_step ??
+    null;
+  const partialFindings = extractStrings(
+    report?.ai_investigation?.primary_evidence,
+    latestAi?.ai_investigation?.primary_evidence,
+    report?.evidence?.primary,
+    report?.evidence?.supporting,
+    report?.evidence?.contradictions,
+    job?.ai_result?.reasoning,
+    job?.timeline,
+  );
+  const suggestedRecovery = extractStrings(
+    report?.recovery?.resolution_plan,
+    latestAi?.ai_investigation?.resolution_plan,
+    job?.recommendations?.actions,
+    job?.recommendations?.items,
+  );
+  const agentLog = extractStrings(
+    report?.diagnostic_trail,
+    report?.agent_log,
+    job?.agent_log,
+    job?.timeline,
+  );
+  const failureTitle =
+    report?.hero?.failure_title ??
+    latestAi?.hero?.failure_title ??
+    incident?.short_description ??
+    job?.incident?.short_description ??
+    job?.current_step ??
+    "Investigation failed";
   const recommendationGroups = [
     {
       title: "Recommendations",
@@ -651,30 +778,56 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
 
   const tech = report?.technical_investigation ?? {};
   const infra = report?.infrastructure ?? [];
+  console.log(
+    "REPORT HERO",
+    JSON.stringify(report?.hero, null, 2)
+  );
+  console.log("INCIDENT", incident);
+  console.log("JOB CONTEXT", job?.context);
   return {
+    reportState,
+    isFailed,
     heroShortDescription: shortDescription,
     heroDescription: incidentDescription,
-    heroCause: cause,
-    heroHow: how,
-    heroConfidence: confidence,
-    heroDuration: investigationTime,
+    heroCause: isFailed ? failureSummary ?? cause : cause,
+    heroHow: isFailed ? failureReason ?? how : how,
+    heroConfidence: isFailed ? null : confidence,
+    heroDuration: isFailed ? investigationTime ?? job?.completed_at ?? "0s" : investigationTime,
     heroApp: report?.hero?.application ?? latestAi?.hero?.application ?? applicationName,
-    heroEnv: report?.hero?.environment ?? "Production",
-    heroGeneratedAt: report?.hero?.generated_at ?? latestAi?.footer?.generated_at ?? formatDate(job?.started_at),
-    heroVersion: report?.hero?.version ?? latestAi?.hero?.version ?? "AI SRE Agent v4.2.1",
-    heroComponents: report?.hero?.components ?? "14 inspected",
-    heroEta: report?.hero?.eta ?? aiResult?.estimated_recovery_time ?? "-",
+    heroEnv:
+        report?.hero?.environment ??
+        incident?.environment ??
+        job?.context?.environment ??
+        "Unknown",
 
-    executiveRootCause: rootCause,
-    severity: job?.investigation_result?.status ?? "Critical",
+    heroLocation:
+        report?.hero?.location ??
+        incident?.location ??
+        job?.context?.location ??
+        "",
+    heroGeneratedAt: report?.hero?.generated_at ?? latestAi?.footer?.generated_at ?? formatDate(job?.started_at),
+    heroComponents: isFailed ? report?.hero?.components ?? latestAi?.hero?.components ?? "-" : report?.hero?.components ?? "14 inspected",
+    heroEta: formatEta(
+      report?.hero?.eta ??
+        latestAi?.hero?.eta ??
+        aiResult?.estimated_recovery_time ??
+        "-"
+    ),
+
+    executiveRootCause: isFailed ? rootCause : rootCause,
+    severity: job?.investigation_result?.status ?? job?.status ?? "-",
     owner: job?.executive?.recommended_owner ?? "Platform-SRE on-call (Priya Menon)",
     risk: job?.ai_result?.business_impact ?? "Medium - mitigation is a single kubectl patch, reversible in seconds.",
-    businessImpact: report?.executive_summary?.businessImpact ?? latestAi?.ai_investigation?.business_impact ?? job?.impact?.business_impact ?? "No dynamic data available.",
-    currentStatus: report?.executive_summary?.currentStatus ?? latestAi?.ai_investigation?.diagnosis ?? "No dynamic data available.",
+    businessImpact: report?.executive_summary?.businessImpact ?? latestAi?.ai_investigation?.business_impact ?? job?.impact?.business_impact ?? "-",
+    currentStatus: report?.executive_summary?.currentStatus ?? latestAi?.ai_investigation?.diagnosis ?? job?.current_step ?? "-",
     confidenceReasons: report?.ai_investigation?.reasoning ?? job?.ai_result?.reasoning ?? [],
-    failurePoint: report?.ai_investigation?.failure_point ?? latestAi?.ai_investigation?.failure_point ?? "No dynamic data available.",
+    failurePoint: failureReason ?? report?.ai_investigation?.failure_point ?? latestAi?.ai_investigation?.failure_point ?? "-",
     primaryEvidence: report?.ai_investigation?.primary_evidence ?? latestAi?.ai_investigation?.primary_evidence ?? [],
     alternatives: report?.ai_investigation?.alternatives ?? latestAi?.ai_investigation?.alternatives ?? [],
+    partialFindings: isFailed ? partialFindings : [],
+    suggestedRecovery: isFailed ? suggestedRecovery : [],
+    agentLog: isFailed ? agentLog : [],
+    failureTitle,
 
     logsTitle: tech.logs?.title ?? "Logs",
     logsSummary: tech.logs?.summary ?? "-",
@@ -755,6 +908,944 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
   };
 }
 
+function FailureHero({ data }: { data: AnyObj }) {
+
+  return (
+    <Paper
+      sx={{
+        p: { xs: 2, md: 2.25 },
+        borderRadius: 4,
+        background:
+          "linear-gradient(135deg,#FEF2F2 0%,#FFF7ED 100%)",
+        border: "1px solid #FECACA",
+        mb: 1,
+      }}
+    >
+      <Stack spacing={1.25}>
+
+        <Stack
+          direction="row"
+          justifyContent="space-between"
+          alignItems="flex-start"
+          spacing={2}
+        >
+          <Box>
+            <Typography
+              sx={{
+                fontSize: { xs: 22, md: 26 },
+                fontWeight: 800,
+                color: "#991B1B",
+                lineHeight: 1.05,
+              }}
+            >
+              Investigation Terminated
+            </Typography>
+
+            <Typography
+              sx={{
+                mt: 0.5,
+                color: "#7F1D1D",
+                fontSize: { xs: 13, md: 14 },
+                lineHeight: 1.45,
+                maxWidth: 1000,
+              }}
+            >
+              The investigation could not complete because the application
+              could not be validated.
+            </Typography>
+          </Box>
+
+          <Chip
+            color="error"
+            label="FAILED"
+            size="small"
+            sx={{ fontWeight: 700, height: 28 }}
+          />
+        </Stack>
+
+        <Divider />
+
+        <Box
+          sx={{
+            display: "grid",
+            gridTemplateColumns: {
+                xs: "1fr",
+                md: "repeat(3,1fr)",
+            },
+            gap: 1.5,
+          }}
+        >
+          <Paper
+            variant="outlined"
+            sx={{ p: 1.5, borderRadius: 3 }}
+          >
+            <Typography
+              variant="caption"
+              color="text.secondary"
+            >
+              Failure Stage
+            </Typography>
+
+            <Typography
+              fontWeight={700}
+              mt={0.5}
+              fontSize={14}
+            >
+              Application Validation
+            </Typography>
+          </Paper>
+
+          <Paper
+            variant="outlined"
+            sx={{ p: 1.5, borderRadius: 3 }}
+          >
+            <Typography
+              variant="caption"
+              color="text.secondary"
+            >
+              Application
+            </Typography>
+
+            <Typography
+              fontWeight={700}
+              mt={0.5}
+              fontSize={14}
+            >
+              {data.heroApp || "Unknown"}
+            </Typography>
+          </Paper>
+
+          <Paper
+            variant="outlined"
+            sx={{ p: 1.5, borderRadius: 3 }}
+          >
+            <Typography
+              variant="caption"
+              color="text.secondary"
+            >
+              Environment
+            </Typography>
+
+            <Typography
+              fontWeight={700}
+              mt={0.5}
+              fontSize={14}
+            >
+              {data.heroEnvironment || "Unknown"}
+            </Typography>
+          </Paper>
+        </Box>
+        <Paper
+            variant="outlined"
+            sx={{
+                mt: 1.5,
+                p: 1.75,
+                borderRadius: 3,
+            }}
+        >
+            <Typography
+                sx={{
+                    fontWeight: 700,
+                    fontSize: 16,
+                    mb: 0.75,
+                }}
+            >
+                Root Cause
+            </Typography>
+
+            <Typography
+                sx={{
+                    color: "#64748B",
+                    lineHeight: 1.5,
+                    fontSize: 14,
+                    whiteSpace: "pre-wrap",
+                }}
+            >
+                {data.failurePoint || "Application validation failed."}
+            </Typography>
+        </Paper>
+      </Stack>
+    </Paper>
+  );
+
+}
+
+function FailureFindingsSection({ data }: { data: AnyObj }) {
+
+    const stages = data.stages ?? [
+        {
+            name: "Incident Retrieved",
+            status: "SUCCESS",
+            reason: "Incident payload received successfully."
+        },
+        {
+            name: "Incident Parsed",
+            status: "SUCCESS",
+            reason: "Incident fields extracted."
+        },
+        {
+            name: "Application Identified",
+            status: data.heroApp ? "SUCCESS" : "FAILED",
+            reason: data.heroApp
+                ? data.heroApp
+                : "Application could not be identified."
+        },
+        {
+            name: "Application Validation",
+            status: "FAILED",
+            reason: data.failurePoint || "Validation failed."
+        },
+        {
+            name: "Namespace Discovery",
+            status: "SKIPPED",
+            reason: "Depends on application validation."
+        },
+        {
+            name: "Loki",
+            status: data.lokiLogs?.length ? "SUCCESS" : "SKIPPED",
+            reason: data.lokiLogs?.length
+                ? "Logs collected."
+                : "Logs not collected."
+        },
+        {
+            name: "Prometheus",
+            status: "SKIPPED",
+            reason: "Metrics were not queried."
+        },
+        {
+            name: "Kubernetes",
+            status: "SKIPPED",
+            reason: "Resources not inspected."
+        },
+        {
+            name: "ArgoCD",
+            status: "SKIPPED",
+            reason: "Deployment history unavailable."
+        },
+        {
+            name: "AI Diagnosis",
+            status: "SKIPPED",
+            reason: "Investigation stopped before reasoning."
+        }
+    ];
+    return (
+    <Paper
+      sx={{
+        mt: 2,
+        p: { xs: 2, md: 2.25 },
+        borderRadius: 4,
+      }}
+    >
+      <Typography
+        sx={{
+          fontSize: { xs: 20, md: 22 },
+          fontWeight: 800,
+        }}
+      >
+        Investigation Progress
+      </Typography>
+
+      <Typography
+        sx={{
+          mt: 0.75,
+          color: "#64748B",
+          fontSize: 13,
+        }}
+      >
+        Investigation execution stopped before all diagnostics completed.
+      </Typography>
+
+      <Box sx={{ mt: 2 }}>
+
+        {stages.map((stage, index) => {
+
+          const color =
+            stage.status === "SUCCESS"
+              ? "#22C55E"
+              : stage.status === "FAILED"
+              ? "#EF4444"
+              : "#94A3B8";
+
+          const icon =
+            stage.status === "SUCCESS"
+              ? "✓"
+              : stage.status === "FAILED"
+              ? "✕"
+              : "○";
+
+          return (
+
+            <Paper
+              key={index}
+              elevation={0}
+              sx={{
+                mb: 1,
+                p: 1.5,
+                borderRadius: 3,
+                border: "1px solid #E5E7EB",
+              }}
+            >
+              <Box
+                sx={{
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                }}
+              >
+                <Box
+                  sx={{
+                    display: "flex",
+                    gap: 2,
+                    alignItems: "center",
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 28,
+                      height: 28,
+                      borderRadius: "50%",
+                      bgcolor: color,
+                      color: "#fff",
+                      display: "grid",
+                      placeItems: "center",
+                      fontWeight: 800,
+                    }}
+                  >
+                    {icon}
+                  </Box>
+
+                  <Box>
+                    <Typography
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: 14,
+                      }}
+                    >
+                      {stage.name}
+                    </Typography>
+
+                    <Typography
+                      sx={{
+                        color: "#64748B",
+                        fontSize: 13,
+                      }}
+                    >
+                      {stage.reason}
+                    </Typography>
+                  </Box>
+                </Box>
+
+                <Chip
+                  label={stage.status}
+                  color={
+                    stage.status === "SUCCESS"
+                      ? "success"
+                      : stage.status === "FAILED"
+                      ? "error"
+                      : "default"
+                  }
+                />
+              </Box>
+            </Paper>
+
+          );
+
+        })}
+
+      </Box>
+    </Paper>
+  );
+
+}
+
+function FailureRecoverySection({ data }: { data: AnyObj }) {
+
+  const resources = [
+    {
+      name: "Namespace",
+      status: "NOT AVAILABLE",
+      reason: "Application validation failed.",
+    },
+    {
+      name: "Prometheus",
+      status: "NOT COLLECTED",
+      reason: "Metrics investigation did not start.",
+    },
+    {
+      name: "Kubernetes",
+      status: "NOT COLLECTED",
+      reason: "Cluster investigation did not start.",
+    },
+    {
+      name: "ArgoCD",
+      status: "NOT COLLECTED",
+      reason: "Deployment investigation did not start.",
+    },
+    {
+      name: "AI Diagnosis",
+      status: "NOT EXECUTED",
+      reason: "Investigation terminated before reasoning.",
+    },
+  ];
+
+  return (
+    <Paper
+      sx={{
+        mt: 2,
+        p: { xs: 2, md: 2.25 },
+        borderRadius: 4,
+      }}
+    >
+      <Typography
+        sx={{
+          fontSize: { xs: 20, md: 22 },
+          fontWeight: 800,
+        }}
+      >
+        Missing Investigation Resources
+      </Typography>
+
+      <Typography
+        sx={{
+          mt: 0.75,
+          color: "#64748B",
+          fontSize: 13,
+        }}
+      >
+        The following investigation resources were unavailable because the investigation stopped early.
+      </Typography>
+
+      <Box
+        sx={{
+          mt: 2,
+          display: "flex",
+          gap: 1.2,
+          flexWrap: { xs: "wrap", md: "nowrap" },
+          overflowX: { xs: "visible", md: "auto" },
+          pb: 0.5,
+        }}
+      >
+        {resources.map((resource) => (
+          <Paper
+            key={resource.name}
+            elevation={0}
+            sx={{
+              p: 1.25,
+              borderRadius: 3,
+              border: "1px solid #E5E7EB",
+              minWidth: { xs: "100%", md: 180 },
+              flex: { xs: "1 1 100%", md: "1 1 0" },
+            }}
+          >
+            <Typography
+              sx={{
+                fontWeight: 700,
+                fontSize: 14,
+              }}
+            >
+              {resource.name}
+            </Typography>
+
+            <Chip
+              label={resource.status}
+              color="warning"
+              size="small"
+              sx={{ mt: 0.75, mb: 0.75, height: 20, fontSize: 10.5 }}
+            />
+
+            <Typography
+              sx={{
+                color: "#64748B",
+                fontSize: 12,
+                lineHeight: 1.35,
+              }}
+            >
+              {resource.reason}
+            </Typography>
+          </Paper>
+        ))}
+      </Box>
+    </Paper>
+  );
+
+}
+
+function FailureLokiLogsSection({ data }: { data: AnyObj }) {
+  const logs = data.lokiLogs ?? [];
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        mt: 2,
+        borderRadius: 4,
+        overflow: "hidden",
+        border: "1px solid #E5E7EB",
+      }}
+    >
+      <Box
+        sx={{
+          px: 2,
+          py: 1.5,
+          bgcolor: "#0F172A",
+          color: "#fff",
+        }}
+      >
+        <Typography
+          sx={{
+            fontSize: 16,
+            fontWeight: 800,
+          }}
+        >
+          Loki Logs
+        </Typography>
+
+        <Typography
+          sx={{
+            mt: 0.5,
+            color: "rgba(255,255,255,.7)",
+          }}
+        >
+          Logs collected before the investigation terminated.
+        </Typography>
+      </Box>
+
+      {logs.length === 0 ? (
+        <Box sx={{ p: 2.5 }}>
+          <Typography
+            sx={{
+              fontWeight: 700,
+              color: "#111827",
+            }}
+          >
+            No logs collected
+          </Typography>
+
+          <Typography
+            sx={{
+              mt: 1,
+              color: "#6B7280",
+            }}
+          >
+            Loki was not queried or no log entries were returned before
+            the investigation stopped.
+          </Typography>
+        </Box>
+      ) : (
+        <Box
+          sx={{
+            bgcolor: "#020617",
+            color: "#E5E7EB",
+            fontFamily: "monospace",
+            p: 2,
+            maxHeight: 360,
+            overflow: "auto",
+          }}
+        >
+          {logs.map((line: any, index: number) => (
+            <Typography
+              key={index}
+              sx={{
+                fontFamily: "inherit",
+                fontSize: 13,
+                whiteSpace: "pre-wrap",
+                py: 0.35,
+              }}
+            >
+              {typeof line === "string"
+                ? line
+                : line.message ??
+                  line.log ??
+                  JSON.stringify(line)}
+            </Typography>
+          ))}
+        </Box>
+      )}
+    </Paper>
+  );
+}
+
+function FailureAgentLogSection({ data }: { data: AnyObj }) {
+  const logs =
+    data.agentLog && data.agentLog.length
+      ? data.agentLog
+      : [
+          "Investigation started.",
+          "Parsing ServiceNow incident payload.",
+          "Application context identified.",
+          "Connecting to observability platform.",
+          "Querying Grafana metrics.",
+          "Querying Loki logs.",
+          "Collecting Kubernetes resources.",
+          "Investigation terminated unexpectedly.",
+        ];
+
+  return (
+    <Paper
+      elevation={0}
+      sx={{
+        mt: 2,
+        borderRadius: 5,
+        overflow: "hidden",
+        border: "1px solid #1F2937",
+      }}
+    >
+      <Box
+        sx={{
+          px: 2,
+          py: 1.1,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          background: "#111827",
+          color: "#fff",
+        }}
+      >
+        <Box>
+          <Typography
+            sx={{
+              fontWeight: 800,
+              fontSize: 14,
+              lineHeight: 1.1,
+            }}
+          >
+            AI Agent Execution Log
+          </Typography>
+
+          <Typography
+            sx={{
+              mt: 0.35,
+              color: "rgba(255,255,255,.65)",
+              fontSize: 12,
+              lineHeight: 1.35,
+            }}
+          >
+            Complete execution timeline captured before the investigation
+            stopped.
+          </Typography>
+        </Box>
+
+        <Box
+          sx={{
+            display: "flex",
+            gap: 1,
+          }}
+        >
+          <Button
+            variant="outlined"
+            size="small"
+            sx={{
+              color: "#fff",
+              borderColor: "rgba(255,255,255,.25)",
+              textTransform: "none",
+              fontSize: 12,
+              py: 0.4,
+              px: 1.2,
+            }}
+          >
+            Copy Logs
+          </Button>
+
+          <Button
+            variant="contained"
+            size="small"
+            sx={{
+              textTransform: "none",
+              fontSize: 12,
+              py: 0.4,
+              px: 1.2,
+            }}
+          >
+            Download
+          </Button>
+        </Box>
+      </Box>
+
+      <Box
+        sx={{
+          bgcolor: "#020617",
+          p: 1.75,
+          fontFamily: "monospace",
+          maxHeight: 320,
+          overflow: "auto",
+        }}
+      >
+        {logs.map((line: string, index: number) => {
+          const level =
+            line.toLowerCase().includes("error") ||
+            line.toLowerCase().includes("terminated")
+              ? "ERROR"
+              : line.toLowerCase().includes("warning")
+              ? "WARNING"
+              : line.toLowerCase().includes("success")
+              ? "SUCCESS"
+              : "INFO";
+
+          const levelColor =
+            level === "ERROR"
+              ? "#EF4444"
+              : level === "WARNING"
+              ? "#F59E0B"
+              : level === "SUCCESS"
+              ? "#10B981"
+              : "#3B82F6";
+
+          return (
+            <Box
+              key={index}
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "76px 86px 1fr",
+                gap: 1.5,
+                alignItems: "center",
+                py: 0.9,
+                borderBottom:
+                  index === logs.length - 1
+                    ? "none"
+                    : "1px solid rgba(255,255,255,.06)",
+              }}
+            >
+              <Typography
+                sx={{
+                  color: "#94A3B8",
+                  fontSize: 12,
+                  fontFamily: "inherit",
+                }}
+              >
+                12:0{Math.min(index + 1, 9)}:1{index}
+              </Typography>
+
+              <Chip
+                size="small"
+                label={level}
+                sx={{
+                  width: 84,
+                  height: 24,
+                  fontSize: 11,
+                  bgcolor: levelColor,
+                  color: "#fff",
+                  fontWeight: 700,
+                }}
+              />
+
+              <Typography
+                sx={{
+                  color: "#E5E7EB",
+                  fontFamily: "inherit",
+                  fontSize: 12.5,
+                  whiteSpace: "pre-wrap",
+                }}
+              >
+                {line}
+              </Typography>
+                          </Box>
+          );
+        })}
+
+        <Paper
+          elevation={0}
+          sx={{
+            mt: 2,
+            p: 2,
+            bgcolor: "#0F172A",
+            border: "1px solid rgba(255,255,255,.08)",
+            borderRadius: 3,
+          }}
+        >
+          <Typography
+            sx={{
+              color: "#F8FAFC",
+              fontWeight: 700,
+              fontSize: 14,
+            }}
+          >
+            Execution Summary
+          </Typography>
+
+          <Box
+            sx={{
+              mt: 2,
+              display: "grid",
+              gridTemplateColumns: {
+                xs: "1fr",
+              md: "repeat(4,1fr)",
+              },
+              gap: 1.5,
+            }}
+          >
+            <Paper
+              elevation={0}
+              sx={{
+                p: 1.5,
+                bgcolor: "#111827",
+                borderRadius: 2,
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: 10.5,
+                  color: "#94A3B8",
+                  letterSpacing: ".08em",
+                }}
+              >
+                TOTAL STEPS
+              </Typography>
+
+              <Typography
+                sx={{
+                  mt: 1,
+                  color: "#fff",
+                  fontWeight: 800,
+                  fontSize: 24,
+                }}
+              >
+                {logs.length}
+              </Typography>
+            </Paper>
+
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                bgcolor: "#111827",
+                borderRadius: 2,
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: 11,
+                  color: "#94A3B8",
+                  letterSpacing: ".08em",
+                }}
+              >
+                STATUS
+              </Typography>
+
+              <Typography
+                sx={{
+                  mt: 1,
+                  color: "#EF4444",
+                  fontWeight: 800,
+                }}
+              >
+                Failed
+              </Typography>
+            </Paper>
+
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                bgcolor: "#111827",
+                borderRadius: 2,
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: 11,
+                  color: "#94A3B8",
+                  letterSpacing: ".08em",
+                }}
+              >
+                DURATION
+              </Typography>
+
+              <Typography
+                sx={{
+                  mt: 1,
+                  color: "#fff",
+                  fontWeight: 800,
+                }}
+              >
+                12 sec
+              </Typography>
+            </Paper>
+
+            <Paper
+              elevation={0}
+              sx={{
+                p: 2,
+                bgcolor: "#111827",
+                borderRadius: 2,
+              }}
+            >
+              <Typography
+                sx={{
+                  fontSize: 11,
+                  color: "#94A3B8",
+                  letterSpacing: ".08em",
+                }}
+              >
+                ENGINE
+              </Typography>
+
+              <Typography
+                sx={{
+                  mt: 1,
+                  color: "#10B981",
+                  fontWeight: 800,
+                }}
+              >
+                AI SRE Agent
+              </Typography>
+            </Paper>
+          </Box>
+
+          <Typography
+            sx={{
+              mt: 3,
+              color: "#CBD5E1",
+              lineHeight: 1.8,
+            }}
+          >
+            The investigation stopped before completing all planned
+            diagnostic stages. Review the execution log above to identify
+            the failing step, resolve the underlying issue, and rerun the
+            investigation for a complete AI-generated diagnosis.
+          </Typography>
+        </Paper>
+      </Box>
+          </Paper>
+  );
+}
+
+function extractStrings(...sources: any[]) {
+  const values: string[] = [];
+
+  const push = (value: any) => {
+    if (!value) return;
+
+    if (typeof value === "string") {
+      const trimmed = value.trim();
+      if (trimmed) values.push(trimmed);
+      return;
+    }
+
+    if (Array.isArray(value)) {
+      value.forEach(push);
+      return;
+    }
+
+    if (typeof value === "object") {
+      const candidates = [
+        value.title,
+        value.summary,
+        value.description,
+        value.detail,
+        value.reason,
+        value.message,
+        value.event,
+        value.action,
+        value.command,
+      ];
+      candidates.forEach(push);
+    }
+  };
+
+  sources.forEach(push);
+  return Array.from(new Set(values));
+}
+
 function formatDate(value?: string) {
   if (!value) return "-";
   const date = new Date(value);
@@ -768,6 +1859,21 @@ function formatDate(value?: string) {
     hour12: true,
     timeZoneName: "short",
   }).format(date);
+}
+
+function formatEta(value?: string | null) {
+  if (!value) return "-";
+
+  const text = String(value).trim();
+  if (!text) return "-";
+
+  const timeMatch = text.match(/\b\d+(?:\.\d+)?\s*(?:ms|s|sec|secs|second|seconds|m|min|mins|minute|minutes|h|hr|hrs|hour|hours)\b/i);
+  if (timeMatch) {
+    return timeMatch[0].replace(/\s+/g, " ");
+  }
+
+  const firstToken = text.split(/[,\.;]/)[0]?.trim();
+  return firstToken || "-";
 }
 
 function TopologyTile({
@@ -840,7 +1946,7 @@ function RecommendationCard({
   items: string[];
 }) {
   return (
-    <Paper sx={{ p: 2.5, borderRadius: 4, borderLeft: `4px solid ${accent}`, minHeight: 216 }}>
+    <Paper sx={{ p: 2, borderRadius: 4, borderLeft: `4px solid ${accent}`, minHeight: 216 }}>
       <Typography sx={{ fontWeight: 800, color: accent, fontSize: 18 }}>{title}</Typography>
       <Box sx={{ mt: 1.8, display: "grid", gap: 1.4 }}>
         {items.length ? items.map((item, index) => <Bullet key={index}>{item}</Bullet>) : <Typography sx={{ color: "#6B7280" }}>No dynamic data available.</Typography>}
@@ -861,9 +1967,9 @@ function SectionCard({
   children: React.ReactNode;
 }) {
   return (
-    <Paper sx={{ p: 2.5, borderRadius: 4, borderLeft: accent ? `4px solid ${accent === "red" ? "#EF4444" : accent}` : undefined }}>
-      <Typography sx={{ fontSize: 12, fontWeight: 800, letterSpacing: "0.08em", color: "#6B7280" }}>{title}</Typography>
-      <Typography sx={{ mt: large ? 1.2 : 0.8, fontSize: large ? 18 : 15, lineHeight: 1.6, color: "#111827" }}>{children}</Typography>
+    <Paper sx={{ p: 1.5, borderRadius: 4, borderLeft: accent ? `4px solid ${accent === "red" ? "#EF4444" : accent}` : undefined }}>
+      <Typography sx={{ fontSize: 9.5, fontWeight: 800, letterSpacing: "0.08em", color: "#6B7280" }}>{title}</Typography>
+      <Typography sx={{ mt: large ? 0.8 : 0.6, fontSize: large ? 13.5 : 11.8, lineHeight: 1.4, color: "#111827" }}>{children}</Typography>
     </Paper>
   );
 }
@@ -871,8 +1977,8 @@ function SectionCard({
 function DetailLine({ label, value }: { label: string; value: string }) {
   return (
     <Box sx={{ display: "grid", gridTemplateColumns: "72px 1fr", gap: 2 }}>
-      <Typography sx={{ color: "#6B7280", fontSize: 14 }}>{label}</Typography>
-      <Typography sx={{ color: "#111827", fontSize: 14, fontWeight: 600, textAlign: "right" }}>{value}</Typography>
+      <Typography sx={{ color: "#6B7280", fontSize: 10.5 }}>{label}</Typography>
+      <Typography sx={{ color: "#111827", fontSize: 10.5, fontWeight: 600, textAlign: "right" }}>{value}</Typography>
     </Box>
   );
 }

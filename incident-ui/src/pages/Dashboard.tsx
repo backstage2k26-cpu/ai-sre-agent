@@ -10,7 +10,11 @@ import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import AssistantRoundedIcon from "@mui/icons-material/AssistantRounded";
 
 import KpiCard from "../components/KpiCard";
-import { getDashboard, getIncidentTrend } from "../services/dashboardService";
+import {
+  getDashboard,
+  getIncidentTrend,
+  getServiceNowStatus,
+} from "../services/dashboardService";
 import { getRecentIncidents } from "../services/recentIncidentService";
 import type { Incident } from "../types/incident";
 import {
@@ -205,6 +209,7 @@ export default function Dashboard() {
   const [refreshing, setRefreshing] = useState(false);
   const [updatedAt, setUpdatedAt] = useState("");
   const [trendData, setTrendData] = useState<IncidentTrend[]>([]);
+  const [serviceNowOnline, setServiceNowOnline] = useState<boolean | null>(null);
 
   const loadDashboard = async () => {
     setRefreshing(true);
@@ -223,6 +228,9 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Failed to load dashboard:", error);
     } finally {
+      getServiceNowStatus()
+        .then((status) => setServiceNowOnline(status.online))
+        .catch(() => setServiceNowOnline(false));
       setLoading(false);
       setRefreshing(false);
     }
@@ -237,11 +245,20 @@ export default function Dashboard() {
       setUpdatedAt(formatClockLabel(new Date()));
     }, 30_000);
 
+    const serviceNowTimer = window.setInterval(() => {
+      getServiceNowStatus()
+        .then((status) => setServiceNowOnline(status.online))
+        .catch(() => setServiceNowOnline(false));
+    }, 60_000);
+
     if (!updatedAt) {
       setUpdatedAt(formatClockLabel(new Date()));
     }
 
-    return () => window.clearInterval(timer);
+    return () => {
+      window.clearInterval(timer);
+      window.clearInterval(serviceNowTimer);
+    };
   }, [updatedAt]);
 
   const kpis = useMemo(() => {
@@ -262,7 +279,7 @@ export default function Dashboard() {
         title: "Total Incidents",
         value: dashboard?.total_incidents.value ?? 0,
         tone: "indigo",
-        icon: "clipboard",
+        icon: "pulse",
         delta: deltaText(dashboard?.total_incidents.delta ?? 0),
         deltaTone: deltaTone(dashboard?.total_incidents.delta ?? 0),
       },
@@ -271,7 +288,7 @@ export default function Dashboard() {
         title: "AI Resolved",
         value: dashboard?.resolved.value ?? 0,
         tone: "green",
-        icon: "flag",
+        icon: "check",
         delta: deltaText(dashboard?.resolved.delta ?? 0),
         deltaTone: deltaTone(dashboard?.resolved.delta ?? 0),
       },
@@ -280,7 +297,7 @@ export default function Dashboard() {
         title: "Failed Investigations",
         value: dashboard?.failed?.value ?? 0,
         tone: "red",
-        icon: "close",
+        icon: "alert",
         delta: deltaText(dashboard?.failed?.delta ?? 0),
         deltaTone: deltaTone(dashboard?.failed?.delta ?? 0),
       },
@@ -289,7 +306,7 @@ export default function Dashboard() {
         title: "High Priority",
         value: dashboard?.high_priority_incidents?.value ?? 0,
         tone: "green",
-        icon: "check",
+        icon: "search",
         delta: deltaText(dashboard?.high_priority_incidents?.delta ?? 0),
         deltaTone: deltaTone(
           dashboard?.high_priority_incidents?.delta ?? 0,
@@ -318,7 +335,7 @@ export default function Dashboard() {
           dashboard?.avg_confidence?.value,
         ),
         tone: "blue",
-        icon: "pulse",
+        icon: "brain",
         delta: deltaText(
           dashboard?.avg_confidence?.delta ?? 0,
         ),
@@ -413,6 +430,33 @@ export default function Dashboard() {
           })}
 
           <Box className="dashboard-actions">
+            <Box
+              className={`dashboard-connection ${
+                serviceNowOnline === false
+                  ? "is-offline"
+                  : serviceNowOnline === true
+                    ? "is-online"
+                    : "is-checking"
+              }`}
+              aria-label={`ServiceNow ${
+                serviceNowOnline === false
+                  ? "offline"
+                  : serviceNowOnline === true
+                    ? "connected"
+                    : "checking"
+              }`}
+            >
+              <span className="dashboard-connection-dot" />
+              <NetworkCheckRoundedIcon className="dashboard-connection-icon" />
+              <span className="dashboard-connection-text">
+                ServiceNow{" "}
+                {serviceNowOnline === false
+                  ? "Offline"
+                  : serviceNowOnline === true
+                    ? "Connected"
+                    : "Checking"}
+              </span>
+            </Box>
             <Box className="dashboard-datetime">
               {updatedAt || formatClockLabel(new Date())}
             </Box>

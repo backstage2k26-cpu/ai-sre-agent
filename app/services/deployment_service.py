@@ -18,7 +18,7 @@ class DeploymentService:
     ) -> DeploymentInfo:
 
         app = await self.client.get_application(
-            context.application_name
+            context.argocd_application
         )
 
         return self._build_deployment_info(

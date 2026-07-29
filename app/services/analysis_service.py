@@ -111,6 +111,7 @@ class AnalysisService:
             incident_number=incident.number,
             service_name=context.service_name,
             application_name=context.application_name,
+            argocd_application=context.argocd_application,
             namespace=context.namespace,
             normalized_service=normalized_service,
             problem_type=context.problem_type,

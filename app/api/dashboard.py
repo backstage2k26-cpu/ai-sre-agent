@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
+from app.clients.servicenow_client import ServiceNowClient
 from app.database.session import get_db
 from app.repositories.incident_repository import IncidentRepository
 from app.repositories.investigation_repository import InvestigationRepository
@@ -86,3 +87,14 @@ def get_recent_incidents(
         )
 
     return recent
+
+
+@router.get("/servicenow/status")
+async def get_servicenow_status():
+    client = ServiceNowClient()
+
+    try:
+        await client.get_incident_list(limit=1)
+        return {"online": True}
+    except Exception:
+        return {"online": False}

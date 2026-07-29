@@ -117,10 +117,23 @@ class ApplicationResolver:
         print(f"Score        : {best_score:.2f}")
         print("============================================\n")
 
+        # ---------------------------------------------------
+        # Normalize application name
+        # ---------------------------------------------------
+
+        application_name = best_match["name"]
+
+        # If ArgoCD app names follow <app>-<env>, strip the env suffix
+        suffix = f"-{env}"
+
+        if application_name.endswith(suffix):
+            application_name = application_name[: -len(suffix)]
+
         return ApplicationContext(
             service_name=service,
+            application_name=application_name,
+            argocd_application=best_match["name"],
             environment=env,
-            application_name=best_match["name"],
             namespace=best_match["namespace"],
             problem_type=intent.problem_type,
             keywords=intent.keywords,

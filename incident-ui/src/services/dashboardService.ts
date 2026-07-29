@@ -26,3 +26,13 @@ export async function getIncidentTrend(): Promise<IncidentTrend[]> {
 
     return await response.json();
 }
+
+export async function getServiceNowStatus(): Promise<{ online: boolean }> {
+  const response = await fetch(`${API}/dashboard/servicenow/status`);
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch ServiceNow status");
+  }
+
+  return await response.json();
+}

@@ -17,11 +17,10 @@ import {
   Typography,
 } from "@mui/material";
 import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
-import TuneRoundedIcon from "@mui/icons-material/TuneRounded";
-import VisibilityOutlinedIcon from "@mui/icons-material/VisibilityOutlined";
 import DownloadRoundedIcon from "@mui/icons-material/DownloadRounded";
 
 type FilterKey = "all" | "new" | "progress" | "resolved";
+type PriorityFilter = "all" | "critical" | "high" | "medium" | "low";
 
 const PAGE_SIZE = 8;
 const TABLE_COLUMNS = [
@@ -31,14 +30,25 @@ const TABLE_COLUMNS = [
   { label: "Status", width: "14.285%" },
   { label: "Investigation Status", width: "14.285%" },
   { label: "Created At", width: "14.285%" },
-  { label: "Actions", width: "14.285%" },
+  { label: "Summary", width: "14.285%" },
 ] as const;
 
 function priorityLabel(priority: string) {
-  if (priority === "1") return "P1";
-  if (priority === "2") return "P2";
-  if (priority === "3") return "P3";
+  const value = priority.toString().trim().toUpperCase();
+  if (value === "1" || value === "P1" || value === "CRITICAL") return "Critical";
+  if (value === "2" || value === "P2" || value === "HIGH") return "High";
+  if (value === "3" || value === "P3" || value === "MEDIUM" || value === "MODERATE") return "Medium";
+  if (value === "4" || value === "P4" || value === "LOW") return "Low";
   return priority;
+}
+
+function priorityFilterValue(priority: string) {
+  const label = priorityLabel(priority).toLowerCase();
+  if (label.includes("critical")) return "critical";
+  if (label.includes("high")) return "high";
+  if (label.includes("medium")) return "medium";
+  if (label.includes("low")) return "low";
+  return "all";
 }
 
 function statusTone(status: string) {
@@ -48,33 +58,58 @@ function statusTone(status: string) {
   return "info";
 }
 
-function investigationTone(status?: string | null) {
+function investigationLabel(status?: string | null) {
   switch (status) {
     case "RUNNING":
-      return { label: "Running", tone: "info" as const };
-
+      return { label: "In Progress", tone: "info" as const, dot: "#3B82F6", bg: "#EEF4FF", fg: "#3B82F6" };
     case "COMPLETED":
-      return { label: "Completed", tone: "success" as const };
-
+      return { label: "Completed", tone: "default" as const, dot: "#94A3B8", bg: "#F3F4F6", fg: "#64748B" };
     case "FAILED":
-      return { label: "Failed", tone: "error" as const };
-
+      return { label: "Failed", tone: "error" as const, dot: "#EF4444", bg: "#FEF2F2", fg: "#EF4444" };
     default:
-      return { label: "New", tone: "default" as const };
+      return { label: "New", tone: "default" as const, dot: "#94A3B8", bg: "#F3F4F6", fg: "#64748B" };
   }
+}
+
+function statusPillPalette(status: string) {
+  const value = status.toLowerCase();
+
+  if (value.includes("critical") || status === "1") {
+    return { dot: "#EF4444", bg: "#FEF2F2", fg: "#EF4444" };
+  }
+
+  if (value.includes("high") || status === "2") {
+    return { dot: "#3B2B10", bg: "#FFF7E6", fg: "#1F2937" };
+  }
+
+  if (value.includes("medium") || value.includes("moderate") || status === "3") {
+    return { dot: "#0F8ACB", bg: "#EEF4FF", fg: "#0F6FB2" };
+  }
+
+  if (value.includes("low") || status === "4") {
+    return { dot: "#16A34A", bg: "#ECFDF5", fg: "#16A34A" };
+  }
+
+  if (value.includes("resolved")) {
+    return { dot: "#16A34A", bg: "#ECFDF5", fg: "#16A34A" };
+  }
+
+  if (value.includes("hold")) {
+    return { dot: "#D97706", bg: "#FFFBEB", fg: "#D97706" };
+  }
+
+  return { dot: "#64748B", bg: "#F3F4F6", fg: "#64748B" };
 }
 
 export default function Incidents() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
-  const [priority, setPriority] = useState("all");
+  const [priority, setPriority] = useState<PriorityFilter>("all");
   const [filter, setFilter] = useState<FilterKey>("all");
   const [page, setPage] = useState(1);
   const [selectedIncident, setSelectedIncident] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-
-  const navigate = useNavigate();
 
   const loadIncidents = async () => {
     try {
@@ -106,7 +141,7 @@ export default function Incidents() {
         (incident.short_description ?? "").toLowerCase().includes(q);
 
       const matchesPriority =
-        priority === "all" || incident.priority.toUpperCase() === priority.toUpperCase();
+        priority === "all" || priorityFilterValue(incident.priority) === priority;
 
       const state = incident.state.toLowerCase();
       const matchesFilter =
@@ -163,17 +198,11 @@ export default function Incidents() {
 
   return (
     <Box sx={{ px: { xs: 2, md: 4 }, py: { xs: 3, md: 4 } }}>
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          gap: 2.25,
-        }}
-      >
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 1.75 }}>
         <Box>
           <Typography
             sx={{
-              fontSize: { xs: 30, md: 38 },
+              fontSize: { xs: 24, md: 30 },
               fontWeight: 800,
               lineHeight: 1,
               letterSpacing: "-0.05em",
@@ -185,8 +214,8 @@ export default function Incidents() {
 
           <Typography
             sx={{
-              mt: 1,
-              fontSize: { xs: 14, md: 16 },
+              mt: 0.6,
+              fontSize: { xs: 12.5, md: 14 },
               fontWeight: 600,
               color: "var(--text-soft)",
             }}
@@ -195,7 +224,7 @@ export default function Incidents() {
           </Typography>
         </Box>
 
-        <Box sx={{ display: "flex", gap: 1.5, flexWrap: "wrap" }}>
+        <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           {[
             { key: "all", label: "All", count: incidents.length },
             { key: "new", label: "New", count: incidents.filter((i) => !i.state.toLowerCase().includes("progress") && !i.state.toLowerCase().includes("resolve")).length },
@@ -227,7 +256,7 @@ export default function Incidents() {
                     sx={{
                       display: "flex",
                       alignItems: "center",
-                      gap: 1,
+                      gap: 0.75,
                     }}
                   >
                     <Box
@@ -242,7 +271,7 @@ export default function Incidents() {
                     <Typography
                       sx={{
                         fontWeight: 700,
-                        fontSize: 15,
+                        fontSize: 13,
                         color: active ? tone : "#64748B",
                       }}
                     >
@@ -251,15 +280,15 @@ export default function Incidents() {
 
                     <Box
                       sx={{
-                        minWidth: 24,
-                        height: 24,
-                        px: 0.8,
+                        minWidth: 22,
+                        height: 22,
+                        px: 0.6,
                         borderRadius: "999px",
                         bgcolor: "#EEF2F7",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: 13,
+                        fontSize: 11.5,
                         fontWeight: 700,
                         color: "#64748B",
                       }}
@@ -270,11 +299,11 @@ export default function Incidents() {
                 }
                 onClick={() => setFilter(item.key as FilterKey)}
                 sx={{
-                  height: 38,
-                  px: 0.5,
+                  height: 34,
+                  px: 0.35,
                   borderRadius: 999,
                   fontWeight: 800,
-                  fontSize: 13.5,
+                  fontSize: 12.5,
                   bgcolor: active ? toneBg : "#fff",
                   color: active ? tone : "#64748B",
                   border: active ? `1px solid ${tone}` : "1px solid rgba(226,232,240,.95)",
@@ -295,8 +324,8 @@ export default function Incidents() {
         <Box
           sx={{
             display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1fr) 170px" },
-            gap: 1.5,
+            gridTemplateColumns: { xs: "1fr", md: "minmax(0, 1fr) 150px" },
+            gap: 1.1,
             alignItems: "center",
           }}
         >
@@ -305,10 +334,10 @@ export default function Incidents() {
               flex: 1,
               display: "flex",
               alignItems: "center",
-              gap: 1,
-              px: 1.5,
-              minHeight: 44,
-              borderRadius: 1.75,
+              gap: 0.75,
+              px: 1.2,
+              minHeight: 38,
+              borderRadius: 1.5,
               bgcolor: "rgba(255,255,255,.96)",
               border: "1px solid rgba(226,232,240,.9)",
               boxShadow: "0 10px 22px rgba(15,23,42,.06)",
@@ -318,7 +347,7 @@ export default function Incidents() {
             <SearchRoundedIcon
               sx={{
                 color: "#94A3B8",
-                fontSize: 28,
+                fontSize: 22,
               }}
             />
             <TextField
@@ -339,15 +368,15 @@ export default function Incidents() {
                   borderBottom: "none !important",
                 },
                 "& input": {
-                  py: 0.85,
-                  fontSize: 14.5,
+                  py: 0.65,
+                  fontSize: 13,
                   color: "var(--text-strong)",
                 },
               }}
             />
           </Box>
 
-          <Box sx={{ width: 170, justifySelf: "end" }}>
+          <Box sx={{ width: 150, justifySelf: "end" }}>
             <Select
               value={priority}
               onChange={(e) => setPriority(e.target.value)}
@@ -391,13 +420,13 @@ export default function Incidents() {
                 },
               }}
               sx={{
-                height: 44,
+                height: 38,
                 width: "100%",
                 minWidth: 0,
                 "& .MuiSelect-select": {
-                  px: 1.5,
-                  py: 0.35,
-                  fontSize: 13.5,
+                  px: 1.2,
+                  py: 0.25,
+                  fontSize: 12.5,
                   lineHeight: 1.1,
                   display: "flex",
                   alignItems: "center",
@@ -413,9 +442,10 @@ export default function Incidents() {
               }}
             >
               <MenuItem value="all">All Priorities</MenuItem>
-              <MenuItem value="P1">P1</MenuItem>
-              <MenuItem value="P2">P2</MenuItem>
-              <MenuItem value="P3">P3</MenuItem>
+              <MenuItem value="critical">Critical</MenuItem>
+              <MenuItem value="high">High</MenuItem>
+              <MenuItem value="medium">Medium</MenuItem>
+              <MenuItem value="low">Low</MenuItem>
             </Select>
           </Box>
         </Box>
@@ -431,16 +461,16 @@ export default function Incidents() {
         >
           <Box
             sx={{
-              px: 3,
-              py: 1,
-              minHeight: 52,
+              px: 2,
+              py: 0.75,
+              minHeight: 44,
               display: "flex",
               alignItems: "center",
               justifyContent: "space-between",
               borderBottom: "1px solid #EDF2F7",
             }}
           >
-            <Typography sx={{ fontSize: 15.5, fontWeight: 700, color: "#64748B" }}>
+            <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: "#64748B" }}>
               <Box component="span" sx={{ color: "var(--text-strong)" }}>
                 {filteredIncidents.length}
               </Box>{" "}
@@ -453,7 +483,7 @@ export default function Incidents() {
               startIcon={<DownloadRoundedIcon />}
               sx={{
                 textTransform: "none",
-                borderRadius: 1.75,
+                borderRadius: 1.5,
                 fontWeight: 700,
                 color: "#94A3B8",
                 borderColor: "#D7DFEA",
@@ -486,9 +516,9 @@ export default function Incidents() {
                         component="th"
                         sx={{
                           textAlign: "left",
-                          px: 3,
-                          py: 1.5,
-                          fontSize: 13,
+                          px: 0.85,
+                          py: 1.05,
+                          fontSize: 12,
                           color: "#B1BBCB",
                           letterSpacing: "0.08em",
                           fontWeight: 800,
@@ -505,8 +535,6 @@ export default function Incidents() {
 
                 <Box component="tbody">
                   {pagedIncidents.map((incident) => {
-                    const investigation = investigationTone(incident.investigation_status);
-
                     return (
                       <Box
                         component="tr"
@@ -515,29 +543,32 @@ export default function Incidents() {
                           "&:hover": { bgcolor: "#FBFDFF" },
                           cursor: "pointer",
                           borderBottom: "1px solid #F1F5F9",
+                          "& td": {
+                            fontSize: 13.5,
+                          },
                         }}
                         onClick={() => openIncident(incident.number)}
                       >
-                        <Box component="td" sx={{ px: 3, py: 2.1, fontWeight: 800, color: "#FF5B1F", fontSize: 14, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
-                          {incident.number}
-                        </Box>
-                        <Box component="td" sx={{ px: 3, py: 2.1 }}>
-                          <Box
-                            sx={{
-                              display: "inline-flex",
-                              alignItems: "center",
-                              minHeight: 28,
-                              px: 1.25,
-                              borderRadius: 999,
-                              bgcolor: "#EEF3FA",
-                              color: "#64748B",
-                              fontWeight: 800,
-                              fontSize: 12.5,
-                              whiteSpace: "nowrap",
-                              maxWidth: "100%",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                            }}
+                          <Box component="td" sx={{ px: 0.85, py: 1.15, fontWeight: 900, color: "#0F172A", fontSize: 18, letterSpacing: "-0.03em", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                            {incident.number}
+                          </Box>
+                          <Box component="td" sx={{ px: 0.85, py: 1.15 }}>
+                            <Box
+                              sx={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                minHeight: 24,
+                                px: 1,
+                                borderRadius: 999,
+                                bgcolor: "#F3F4F6",
+                                color: "#111827",
+                                fontWeight: 800,
+                                fontSize: 12.5,
+                                whiteSpace: "nowrap",
+                                maxWidth: "100%",
+                                overflow: "hidden",
+                                textOverflow: "ellipsis",
+                              }}
                           >
                             {incident.service ||
                               incident.short_description
@@ -546,30 +577,28 @@ export default function Incidents() {
                               "-"}
                           </Box>
                         </Box>
-                        <Box component="td" sx={{ px: 3, py: 2.1 }}>
-                          <Chip
-                            label={priorityLabel(incident.priority)}
-                            size="small"
-                            sx={{
-                              borderRadius: 999,
-                              fontWeight: 800,
-                              fontSize: 12,
-                              bgcolor:
-                                incident.priority === "1" || incident.priority === "P1"
-                                  ? "#FEF2F2"
-                                  : incident.priority === "2" || incident.priority === "P2"
-                                    ? "#FFFBEB"
-                                    : "#F3F4F6",
-                              color:
-                                incident.priority === "1" || incident.priority === "P1"
-                                  ? "#EF4444"
-                                  : incident.priority === "2" || incident.priority === "P2"
-                                    ? "#D97706"
-                                    : "#6B7280",
-                            }}
-                          />
+                        <Box component="td" sx={{ px: 0.85, py: 1.15 }}>
+                          {(() => {
+                            const p = statusPillPalette(priorityLabel(incident.priority));
+                            return (
+                              <Chip
+                                label={priorityLabel(incident.priority)}
+                                size="small"
+                                icon={<Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: p.dot, ml: 0.75 }} />}
+                                sx={{
+                                  borderRadius: 999,
+                                  fontWeight: 800,
+                                  fontSize: 11.5,
+                                  height: 28,
+                                  bgcolor: p.bg,
+                                  color: p.fg,
+                                  "& .MuiChip-icon": { color: "inherit" },
+                                }}
+                              />
+                            );
+                          })()}
                         </Box>
-                        <Box component="td" sx={{ px: 3, py: 2.1 }}>
+                        <Box component="td" sx={{ px: 0.85, py: 1.15 }}>
                           <Chip
                             label={
                               incident.state.toLowerCase().includes("progress")
@@ -579,38 +608,55 @@ export default function Incidents() {
                                   : "New"
                             }
                             size="small"
+                            icon={<Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "currentColor", ml: 0.75 }} />}
                             sx={{
                               borderRadius: 999,
                               fontWeight: 800,
-                              fontSize: 12,
-                              bgcolor:
-                                statusTone(incident.state) === "success"
-                                  ? "#ECFDF5"
-                                  : statusTone(incident.state) === "warning"
-                                    ? "#FFF7E6"
-                                    : "#EEF4FF",
-                              color:
-                                statusTone(incident.state) === "success"
-                                  ? "#10B981"
-                                  : statusTone(incident.state) === "warning"
-                                    ? "#D97706"
-                                    : "#3B82F6",
+                              fontSize: 11.5,
+                              height: 28,
+                              bgcolor: statusPillPalette(
+                                incident.state.toLowerCase().includes("progress")
+                                  ? "In Progress"
+                                  : incident.state.toLowerCase().includes("resolve")
+                                    ? "Resolved"
+                                    : "New"
+                              ).bg,
+                              color: statusPillPalette(
+                                incident.state.toLowerCase().includes("progress")
+                                  ? "In Progress"
+                                  : incident.state.toLowerCase().includes("resolve")
+                                    ? "Resolved"
+                                    : "New"
+                              ).fg,
                               "& .MuiChip-icon": {
                                 color: "inherit",
                               },
                             }}
-                            icon={<Box component="span" sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: "currentColor", ml: 0.75 }} />}
                           />
                         </Box>
-                         <Box component="td" sx={{ px: 3, py: 2.1 }}>
+                        <Box component="td" sx={{ px: 0.85, py: 1.15 }}>
+                          {(() => {
+                            const inv = investigationLabel(incident.investigation_status);
+                            return (
                           <Chip
-                            label={investigation.label}
+                            label={inv.label}
                             size="small"
-                            color={investigation.tone}
-                            sx={{ fontWeight: 800, fontSize: 12, maxWidth: "100%" }}
+                            icon={<Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: inv.dot, ml: 0.75 }} />}
+                            sx={{
+                              fontWeight: 800,
+                              fontSize: 11.5,
+                              height: 28,
+                              maxWidth: "100%",
+                              borderRadius: 999,
+                              bgcolor: inv.bg,
+                              color: inv.fg,
+                              "& .MuiChip-icon": { color: "inherit" },
+                            }}
                           />
+                            );
+                          })()}
                         </Box>
-                        <Box component="td" sx={{ px: 3, py: 2.1, color: "#A7B4C8", fontSize: 13.5, lineHeight: 1.4, wordBreak: "break-word" }}>
+                        <Box component="td" sx={{ px: 0.85, py: 1.15, color: "#A7B4C8", fontSize: 12.25, lineHeight: 1.3, wordBreak: "break-word" }}>
                           {new Date(
                             (incident as Incident & { opened_at?: string }).opened_at ??
                               new Date().toISOString()
@@ -622,37 +668,8 @@ export default function Incidents() {
                             minute: "2-digit",
                           })}
                         </Box>
-                        <Box component="td" sx={{ px: 3, py: 2.1 }}>
-                          <Button
-                            variant="contained"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (incident.investigation_id) {
-                                navigate(`/reports/${incident.investigation_id}`);
-                              } else {
-                                openIncident(incident.number);
-                              }
-                            }}
-                            startIcon={<VisibilityOutlinedIcon />}
-                            sx={{
-                              bgcolor: "#2E8540",
-                              color: "#fff",
-                              textTransform: "none",
-                              fontWeight: 800,
-                              borderRadius: 1.5,
-                              minWidth: 88,
-                              height: 32,
-                              fontSize: 11.5,
-                              px: 0.8,
-                              boxShadow: "none",
-                              whiteSpace: "nowrap",
-                               "& .MuiButton-startIcon": {
-                                marginRight: 0.3,
-                              },
-                            }}
-                          >
-                            Report
-                          </Button>
+                        <Box component="td" sx={{ px: 0.85, py: 1.15, color: "#111827", fontSize: 13, lineHeight: 1.3 }}>
+                          {incident.short_description || "-"}
                         </Box>
                       </Box>
                     );
@@ -664,7 +681,7 @@ export default function Incidents() {
 
           <Box
             sx={{
-              px: 3,
+              px: 2,
               py: 1,
               minHeight: 52,
               display: "flex",
@@ -673,7 +690,7 @@ export default function Incidents() {
               borderTop: "1px solid #EDF2F7",
             }}
           >
-            <Typography sx={{ color: "#B2BED1", fontWeight: 600, fontSize: 13.5 }}>
+            <Typography sx={{ color: "#B2BED1", fontWeight: 600, fontSize: 14.5 }}>
               Showing {filteredIncidents.length} of {incidents.length} incidents
             </Typography>
 
