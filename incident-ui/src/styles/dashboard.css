@@ -167,8 +167,11 @@
 }
 
 .dashboard-chart-panel {
-    min-height: 360px;
+    height: 420px;
     padding: 20px 24px;
+
+    display: flex;
+    flex-direction: column;
 }
 
 .dashboard-panel-header {
@@ -283,17 +286,6 @@
 
 /* ================= DONUT ================= */
 
-.donut-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-
-  gap: 16px;
-
-  width: 100%;
-  margin-top: 18px;
-}
-
 .donut-chart {
   width: 150px;
   height: 150px;
@@ -313,6 +305,8 @@
   background: #fff;
   border-radius: 50%;
 }
+
+
 
 .priority-legend {
   width: 150px;

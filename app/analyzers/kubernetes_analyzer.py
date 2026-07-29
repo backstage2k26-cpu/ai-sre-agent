@@ -23,7 +23,7 @@ class KubernetesAnalyzer:
 
         for pod in pods:
 
-            if pod["phase"] != "Running":
+            if pod.get("phase") != "Running":
 
                 severity = "HIGH"
 
@@ -54,28 +54,68 @@ class KubernetesAnalyzer:
                     f'Pod {pod["name"]} restarted '
                     f'{pod["restart_count"]} times.'
                 )
+            waiting_reason = pod.get("waiting_reason")
+
+            if waiting_reason == "CrashLoopBackOff":
+
+                severity = "CRITICAL"
+
+                summary = "Application is crash looping."
+
+                findings.append(
+                    f'Pod {pod["name"]} is in CrashLoopBackOff.'
+                )
 
         #
         # Event Analysis
         #
+        critical_reasons = {
+            "FailedScheduling",
+            "FailedMount",
+            "ImagePullBackOff",
+            "ErrImagePull",
+            "CrashLoopBackOff",
+            "OOMKilled",
+        }
+
+        high_reasons = {
+            "BackOff",
+            "Unhealthy",
+            "Failed",
+        }
 
         warning_events = [
             event
             for event in events
-            if event["type"] == "Warning"
+            if event.get("type") == "Warning"
         ]
 
         if warning_events:
 
-            severity = "HIGH"
-
-            summary = "Kubernetes warning events detected."
-
             for event in warning_events:
 
-                findings.append(
-                    f'{event["reason"]}: {event["message"]}'
-                )
+                reason = event.get("reason", "")
+                message = event.get("message", "")
+
+                findings.append(f"{reason}: {message}")
+
+                if reason in critical_reasons:
+
+                    severity = "CRITICAL"
+                    summary = f"Kubernetes detected {reason}."
+
+                elif (
+                    reason in high_reasons
+                    and severity != "CRITICAL"
+                ):
+
+                    severity = "HIGH"
+                    summary = f"Kubernetes detected {reason}."
+
+            if severity == "LOW":
+
+                severity = "MEDIUM"
+                summary = "Kubernetes warning events detected."
 
         else:
 

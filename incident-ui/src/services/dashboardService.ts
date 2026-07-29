@@ -9,3 +9,20 @@ export async function getDashboard() {
 
   return await response.json();
 }
+
+export interface IncidentTrend {
+    day: string;
+    created: number;
+    resolved: number;
+}
+
+export async function getIncidentTrend(): Promise<IncidentTrend[]> {
+
+    const response = await fetch(`${API}/dashboard/incident-trend`);
+
+    if (!response.ok) {
+        throw new Error("Failed to fetch incident trend");
+    }
+
+    return await response.json();
+}

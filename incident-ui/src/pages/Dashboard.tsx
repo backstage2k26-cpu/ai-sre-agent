@@ -10,18 +10,33 @@ import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import AssistantRoundedIcon from "@mui/icons-material/AssistantRounded";
 
 import KpiCard from "../components/KpiCard";
-import { getDashboard } from "../services/dashboardService";
+import { getDashboard, getIncidentTrend } from "../services/dashboardService";
 import { getRecentIncidents } from "../services/recentIncidentService";
 import type { Incident } from "../types/incident";
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from "recharts";
+
+type Metric = {
+  value: number | string;
+  delta: number;
+};
 
 type DashboardResponse = {
-  total_incidents?: number;
-  high_priority_incidents?: number;
-  running_investigations?: number;
-  resolved?: number;
-  failed?: number;
-  avg_investigation_time?: string | number | null;
-  avg_confidence?: string | number | null;
+  total_incidents: Metric;
+  high_priority_incidents: Metric;
+  running_investigations: Metric;
+  resolved: Metric;
+  failed: Metric;
+  avg_investigation_time: Metric;
+  avg_confidence: Metric;
 };
 
 type RecentIncident = Incident & {
@@ -30,15 +45,11 @@ type RecentIncident = Incident & {
   investigation_id?: string | null;
 };
 
-const trendDays = [
-  { day: "Mon", created: 42, resolved: 39 },
-  { day: "Tue", created: 51, resolved: 44 },
-  { day: "Wed", created: 38, resolved: 40 },
-  { day: "Thu", created: 63, resolved: 55 },
-  { day: "Fri", created: 58, resolved: 61 },
-  { day: "Sat", created: 29, resolved: 27 },
-  { day: "Sun", created: 35, resolved: 31 },
-];
+interface IncidentTrend {
+  day: string;
+  created: number;
+  resolved: number;
+}
 
 function formatAverageTime(value: string | number | null | undefined) {
   if (value == null) return "0m";
@@ -149,12 +160,51 @@ function Panel({
   return <Box className={`dashboard-panel ${className}`}>{children}</Box>;
 }
 
+const CustomTooltip = ({ active, payload, label }: any) => {
+  if (!active || !payload?.length) return null;
+
+  return (
+    <Box
+      sx={{
+        background: "#fff",
+        border: "1px solid #e5e7eb",
+        borderRadius: 2,
+        p: 1.5,
+        boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+      }}
+    >
+      <Typography fontWeight={700}>{label}</Typography>
+
+      <Typography sx={{ color: "#1d4ed8", mt: 0.5 }}>
+        ● Created : {payload[0].value}
+      </Typography>
+
+      <Typography sx={{ color: "#f97316" }}>
+        ● Resolved : {payload[1].value}
+      </Typography>
+    </Box>
+  );
+};
+
+const deltaText = (delta: number) =>
+  `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}%`;
+
+const deltaTone = (
+  delta: number,
+  lowerIsBetter = false,
+): "green" | "red" => {
+  const improved = lowerIsBetter ? delta <= 0 : delta >= 0;
+  return improved ? "green" : "red";
+};
+
 export default function Dashboard() {
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [recentIncidents, setRecentIncidents] = useState<RecentIncident[]>([]);
+
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [updatedAt, setUpdatedAt] = useState("");
+  const [trendData, setTrendData] = useState<IncidentTrend[]>([]);
 
   const loadDashboard = async () => {
     setRefreshing(true);
@@ -163,6 +213,9 @@ export default function Dashboard() {
         getDashboard(),
         getRecentIncidents(),
       ]);
+      const trend = await getIncidentTrend();
+      setTrendData(trend);
+      console.log(trend);
 
       setDashboard(dashboardData);
       setRecentIncidents(incidents);
@@ -192,24 +245,87 @@ export default function Dashboard() {
   }, [updatedAt]);
 
   const kpis = useMemo(() => {
-    const totalIncidents = dashboard?.total_incidents ?? recentIncidents.length;
-    const openIncidents = recentIncidents.filter((incident) =>
-      !incident.state?.toLowerCase?.().includes("resolved"),
-    ).length;
-    const investigating = recentIncidents.filter(
-      (incident) => !!incident.investigation_id || !!incident.investigation_status,
-    ).length;
-    const resolvedToday = dashboard?.resolved ?? 0;
-    const avgTime = formatAverageTime(dashboard?.avg_investigation_time);
-    const confidence = formatConfidence(dashboard?.avg_confidence);
+    const totalIncidents = dashboard?.total_incidents?.value ?? recentIncidents.length;
+
+    const resolvedToday = dashboard?.resolved?.value ?? 0;
+
+    const avgTime = formatAverageTime(
+        dashboard?.avg_investigation_time?.value ?? 0,
+    );
+
+    const confidence = formatConfidence(
+        dashboard?.avg_confidence?.value ?? 0,
+    );
 
     return [
-      { title: "Total Incidents", value: totalIncidents, tone: "indigo" as const, icon: "clipboard" as const, delta: "+4.2%", deltaTone: "red" as const },
-      { title: "Ai Resolved", value: openIncidents, tone: "green" as const, icon: "flag" as const, delta: "-6", deltaTone: "green" as const },
-      { title: "Failed Investigations", value: investigating, tone: "red" as const, icon: "close" as const, delta: "+3", deltaTone: "red" as const },
-      { title: "High Priority", value: resolvedToday, tone: "green" as const, icon: "check" as const, delta: "+11%", deltaTone: "green" as const },
-      { title: "Avg Investigation Time", value: avgTime, tone: "violet" as const, icon: "clock" as const, delta: "-38s", deltaTone: "green" as const },
-      { title: "AI Confidence Avg", value: confidence, tone: "blue" as const, icon: "pulse" as const, delta: "+2.1%", deltaTone: "green" as const },
+      {
+        title: "Total Incidents",
+        value: dashboard?.total_incidents.value ?? 0,
+        tone: "indigo",
+        icon: "clipboard",
+        delta: deltaText(dashboard?.total_incidents.delta ?? 0),
+        deltaTone: deltaTone(dashboard?.total_incidents.delta ?? 0),
+      },
+
+      {
+        title: "AI Resolved",
+        value: dashboard?.resolved.value ?? 0,
+        tone: "green",
+        icon: "flag",
+        delta: deltaText(dashboard?.resolved.delta ?? 0),
+        deltaTone: deltaTone(dashboard?.resolved.delta ?? 0),
+      },
+
+      {
+        title: "Failed Investigations",
+        value: dashboard?.failed?.value ?? 0,
+        tone: "red",
+        icon: "close",
+        delta: deltaText(dashboard?.failed?.delta ?? 0),
+        deltaTone: deltaTone(dashboard?.failed?.delta ?? 0),
+      },
+
+      {
+        title: "High Priority",
+        value: dashboard?.high_priority_incidents?.value ?? 0,
+        tone: "green",
+        icon: "check",
+        delta: deltaText(dashboard?.high_priority_incidents?.delta ?? 0),
+        deltaTone: deltaTone(
+          dashboard?.high_priority_incidents?.delta ?? 0,
+        ),
+      },
+
+      {
+        title: "Avg Investigation Time",
+        value: formatAverageTime(
+          dashboard?.avg_investigation_time?.value,
+        ),
+        tone: "violet",
+        icon: "clock",
+        delta: deltaText(
+          dashboard?.avg_investigation_time?.delta ?? 0,
+        ),
+        deltaTone: deltaTone(
+          dashboard?.avg_investigation_time?.delta ?? 0,
+          true,
+        ),
+      },
+
+      {
+        title: "AI Confidence Avg",
+        value: formatConfidence(
+          dashboard?.avg_confidence?.value,
+        ),
+        tone: "blue",
+        icon: "pulse",
+        delta: deltaText(
+          dashboard?.avg_confidence?.delta ?? 0,
+        ),
+        deltaTone: deltaTone(
+          dashboard?.avg_confidence?.delta ?? 0,
+        ),
+      },
     ];
   }, [dashboard, recentIncidents]);
 
@@ -268,7 +384,7 @@ export default function Dashboard() {
       {
         tone: "green",
         icon: CheckCircleRoundedIcon,
-        text: `AI confidence is currently at ${formatConfidence(dashboard?.avg_confidence)} across ${recentIncidents.length} recent incidents.`,
+        text: `AI confidence is currently at ${formatConfidence(dashboard?.avg_confidence.value)} across ${recentIncidents.length} recent incidents.`,
       },
       {
         tone: "red",
@@ -327,62 +443,94 @@ export default function Dashboard() {
 
         <Box className="dashboard-grid dashboard-grid-top">
           <Panel className="dashboard-chart-panel">
+
             <Box className="dashboard-panel-header">
               {sectionTitle({
                 title: "Incident Trend",
                 subtitle: "Last 7 days",
                 compact: true,
               })}
+
               <Box className="dashboard-legend">
                 <Box className="legend-item">
-                  <Box className="legend-dot legend-created" />
+                  <Box
+                    sx={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: "50%",
+                      bgcolor: "#2563eb",
+                    }}
+                  />
                   <Typography>Created</Typography>
                 </Box>
+
                 <Box className="legend-item">
-                  <Box className="legend-dot legend-resolved" />
+                  <Box
+                    sx={{
+                      width: 10,
+                      height: 10,
+                      borderRadius: "50%",
+                      bgcolor: "#f97316",
+                    }}
+                  />
                   <Typography>Resolved</Typography>
                 </Box>
               </Box>
             </Box>
 
-            <Box className="chart-area">
-              <Box className="chart-y-axis">
-                {[80, 60, 40, 20, 0].map((value) => (
-                  <Typography key={value}>{value}</Typography>
-                ))}
-              </Box>
+            <Box sx={{ width: "100%", height: 340, mt: 2 }}>
 
-              <Box className="chart-lines">
-                <Box className="chart-grid-lines">
-                  {[80, 60, 40, 20, 0].map((value) => (
-                    <Box key={value} className="chart-grid-line" />
-                  ))}
-                </Box>
-                <Box className="line-plot line-created">
-                  {trendDays.map((point) => (
-                    <Box
-                      key={`${point.day}-created`}
-                      className="line-point"
-                      style={{ "--point-top": `${100 - (point.created / 80) * 100}%` } as CSSProperties}
-                    />
-                  ))}
-                </Box>
-                <Box className="line-plot line-resolved">
-                  {trendDays.map((point) => (
-                    <Box
-                      key={`${point.day}-resolved`}
-                      className="line-point line-point-accent"
-                      style={{ "--point-top": `${100 - (point.resolved / 80) * 100}%` } as CSSProperties}
-                    />
-                  ))}
-                </Box>
-                <Box className="chart-x-axis">
-                  {trendDays.map((point) => (
-                    <Typography key={point.day}>{point.day}</Typography>
-                  ))}
-                </Box>
-              </Box>
+              <ResponsiveContainer width="100%" height="100%">
+
+                <LineChart
+                  data={trendData}
+                  margin={{
+                    top: 10,
+                    right: 25,
+                    left: 0,
+                    bottom: 10,
+                  }}
+                >
+
+                  <CartesianGrid
+                    strokeDasharray="4 4"
+                    vertical={false}
+                  />
+
+                  <XAxis
+                    dataKey="day"
+                  />
+
+                  <YAxis
+                    allowDecimals={false}
+                  />
+
+                  <Tooltip content={<CustomTooltip />} />
+
+                  <Line
+                    type="monotone"
+                    dataKey="created"
+                    stroke="#2563eb"
+                    strokeWidth={3}
+                    dot={{ r: 5 }}
+                    activeDot={{ r: 8 }}
+                  />
+
+                  <Line
+                    type="monotone"
+                    dataKey="resolved"
+                    stroke="#f97316"
+                    strokeWidth={3}
+                    dot={{ r: 5 }}
+                    activeDot={{ r: 8 }}
+                  />
+
+                </LineChart>
+
+              </ResponsiveContainer>
+
             </Box>
+
           </Panel>
 
           <Panel className="dashboard-chart-panel">

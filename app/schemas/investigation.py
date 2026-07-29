@@ -14,3 +14,4 @@ class InvestigationContext(BaseModel):
     application_name: str
     namespace: str
     deployment: DeploymentInfo | None = None
+    normalized_service: str

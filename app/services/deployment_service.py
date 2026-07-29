@@ -107,7 +107,23 @@ class DeploymentService:
             sync=sync,
             recent=recent,
             automated=automated,
+            phase=phase,
+            message=message,
+
         )
+        assessment.findings.append(
+            f"Current revision: {revision}"
+        )
+
+        if image:
+            assessment.findings.append(
+                f"Current image: {image}"
+            )
+
+        if len(deployment_history) >= 2:
+            assessment.findings.append(
+                f"Previous revision: {deployment_history[-2].revision}"
+            )
 
         return DeploymentInfo(
 
@@ -150,6 +166,8 @@ class DeploymentService:
         sync: str,
         recent: bool,
         automated: bool,
+        phase: str | None,
+        message: str | None,
     ) -> InvestigationAssessment:
 
         findings = []
@@ -174,6 +192,23 @@ class DeploymentService:
         else:
             findings.append("Application is Synced")
 
+        if phase and phase != "Succeeded":
+
+            findings.append(
+                f"Last deployment operation failed ({phase})."
+            )
+
+            if message:
+                findings.append(message)
+
+            confidence += 0.35
+
+            severity = "HIGH"
+
+            summary = (
+                "ArgoCD deployment operation failed."
+            )
+
         if recent:
             findings.append("Recent deployment detected")
             confidence += 0.30
@@ -185,13 +220,33 @@ class DeploymentService:
         else:
             findings.append("Deployment was manual")
 
-        if confidence >= 0.80:
-            severity = "HIGH"
-            summary = "Deployment is highly correlated with the incident."
+        if recent and health != "Healthy":
 
-        elif confidence >= 0.50:
-            severity = "MEDIUM"
-            summary = "Deployment may be contributing to the incident."
+            summary = (
+                "Recent deployment left the application unhealthy."
+            )
+
+        elif recent and sync != "Synced":
+
+            summary = (
+                "Recent deployment left the application OutOfSync."
+            )
+
+        elif recent:
+
+            summary = (
+                "Incident occurred shortly after a deployment."
+            )
+
+        if summary == "Deployment is unlikely to be related to the incident.":
+
+            if confidence >= 0.80:
+                severity = "HIGH"
+                summary = "Deployment is highly correlated with the incident."
+
+            elif confidence >= 0.50:
+                severity = "MEDIUM"
+                summary = "Deployment may be contributing to the incident."
 
         return InvestigationAssessment(
             source="ArgoCD",

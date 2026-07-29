@@ -27,7 +27,7 @@ class InvestigationSummary(BaseModel):
     metrics: MetricsSummary
     knowledge: KnowledgeSummary
     correlation: CorrelationResult | None = None
-    report: str | None = None
+    report: dict | None = None
     timeline: list | None = None
     network: NetworkSummary
     dependency: DependencySummary

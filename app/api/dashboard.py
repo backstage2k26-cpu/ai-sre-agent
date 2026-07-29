@@ -4,48 +4,23 @@ from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.repositories.incident_repository import IncidentRepository
 from app.repositories.investigation_repository import InvestigationRepository
+from app.services.dashboard_service import DashboardService
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 
-
 @router.get("")
-def get_dashboard(
+async def get_dashboard(
     db: Session = Depends(get_db),
 ):
     incident_repo = IncidentRepository(db)
     investigation_repo = InvestigationRepository(db)
 
-    incidents = incident_repo.list_all()
+    service = DashboardService(
+        incident_repo,
+        investigation_repo,
+    )
 
-    running = 0
-    completed = 0
-    failed = 0
-
-    for incident in incidents:
-        latest = investigation_repo.get_latest_by_incident(
-            incident.number
-        )
-
-        if latest is None:
-            continue
-
-        if latest.status == "RUNNING":
-            running += 1
-        elif latest.status == "COMPLETED":
-            completed += 1
-        elif latest.status == "FAILED":
-            failed += 1
-
-    return {
-        "total_incidents": incident_repo.count_all(),
-        "high_priority_incidents": incident_repo.count_high_priority(),
-        "running_investigations": running,
-        "resolved": completed,
-        "failed": failed,
-        "avg_investigation_time": investigation_repo.get_average_investigation_time(),
-        "avg_confidence": investigation_repo.get_average_confidence(),
-    }
-
+    return await service.get_dashboard_metrics()
 
 @router.get("/running")
 def get_running_investigations(
@@ -66,6 +41,16 @@ def get_running_investigations(
         }
         for i in investigations
     ]
+
+@router.get("/incident-trend")
+async def get_incident_trend():
+
+    service = DashboardService(
+        None,
+        None,
+    )
+
+    return await service.get_incident_trend()
 
 @router.get("/recent")
 def get_recent_incidents(

@@ -1,4 +1,5 @@
 from app.clients.servicenow_client import ServiceNowClient
+import json
 
 
 class ServiceNowUpdateService:
@@ -12,7 +13,6 @@ class ServiceNowUpdateService:
         report: str,
     ):
 
-        # Fetch the latest incident from ServiceNow
         incident = await self.client.get_incident_by_number(
             incident_number
         )
@@ -25,11 +25,11 @@ class ServiceNowUpdateService:
 
         print("\n========== SERVICENOW UPDATE ==========")
         print(f"Incident Number : {incident_number}")
-        print(f"Resolved sys_id : {incident.sys_id}")
+        print(f"Resolved sys_id : {incident['sys_id']}")
         print("=======================================\n")
 
         await self.client.update_incident(
-            incident.sys_id,
+            incident["sys_id"],
             {
                 "work_notes": report,
             },
