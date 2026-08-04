@@ -244,7 +244,7 @@ http://localhost:8000/docs
 # Start Frontend
 
 ```bash
-cd frontend
+cd incident-ui
 
 npm run dev
 ```
