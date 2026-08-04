@@ -58,6 +58,59 @@ function statusTone(status: string) {
   return "info";
 }
 
+function incidentStatusLabel(status?: string | null) {
+  if (!status) return "Unknown";
+
+  const raw = status.toString().trim();
+  const normalized = raw.toLowerCase();
+
+  if (/^\d+$/.test(raw)) {
+    switch (raw) {
+      case "1":
+        return "New";
+      case "2":
+        return "In Progress";
+      case "3":
+        return "On Hold";
+      case "6":
+        return "Resolved";
+      case "7":
+        return "Closed";
+      case "8":
+        return "Canceled";
+      default:
+        return raw;
+    }
+  }
+
+  if (normalized.includes("new")) return "New";
+  if (normalized.includes("progress") || normalized.includes("work in progress")) return "In Progress";
+  if (normalized.includes("hold")) return "On Hold";
+  if (normalized.includes("resolv")) return "Resolved";
+  if (normalized.includes("close")) return "Closed";
+  if (normalized.includes("cancel")) return "Canceled";
+
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+function incidentStatusPalette(status?: string | null) {
+  const label = incidentStatusLabel(status).toLowerCase();
+
+  if (label.includes("resolve") || label.includes("close") || label.includes("cancel")) {
+    return { dot: "#16A34A", bg: "#ECFDF5", fg: "#16A34A" };
+  }
+
+  if (label.includes("progress") || label.includes("hold")) {
+    return { dot: "#D97706", bg: "#FFF7E6", fg: "#D97706" };
+  }
+
+  if (label.includes("new")) {
+    return { dot: "#3B82F6", bg: "#EEF4FF", fg: "#3B82F6" };
+  }
+
+  return { dot: "#64748B", bg: "#F3F4F6", fg: "#64748B" };
+}
+
 function investigationLabel(status?: string | null) {
   switch (status) {
     case "RUNNING":
@@ -143,7 +196,7 @@ export default function Incidents() {
       const matchesPriority =
         priority === "all" || priorityFilterValue(incident.priority) === priority;
 
-      const state = incident.state.toLowerCase();
+      const state = incidentStatusLabel(incident.state).toLowerCase();
       const matchesFilter =
         filter === "all" ||
         (filter === "new" && !state.includes("progress") && !state.includes("resolve")) ||
@@ -227,9 +280,9 @@ export default function Incidents() {
         <Box sx={{ display: "flex", gap: 1, flexWrap: "wrap" }}>
           {[
             { key: "all", label: "All", count: incidents.length },
-            { key: "new", label: "New", count: incidents.filter((i) => !i.state.toLowerCase().includes("progress") && !i.state.toLowerCase().includes("resolve")).length },
-            { key: "progress", label: "In Progress", count: incidents.filter((i) => i.state.toLowerCase().includes("progress")).length },
-            { key: "resolved", label: "Resolved", count: incidents.filter((i) => i.state.toLowerCase().includes("resolve")).length },
+            { key: "new", label: "New", count: incidents.filter((i) => incidentStatusLabel(i.state) === "New").length },
+            { key: "progress", label: "In Progress", count: incidents.filter((i) => incidentStatusLabel(i.state) === "In Progress").length },
+            { key: "resolved", label: "Resolved", count: incidents.filter((i) => incidentStatusLabel(i.state) === "Resolved").length },
           ].map((item) => {
             const active = filter === item.key;
             const tone =
@@ -256,13 +309,13 @@ export default function Incidents() {
                     sx={{
                       display: "flex",
                       alignItems: "center",
-                      gap: 0.75,
+                      gap: 0.55,
                     }}
                   >
                     <Box
                       sx={{
-                        width: 8,
-                        height: 8,
+                        width: 6.5,
+                        height: 6.5,
                         borderRadius: "50%",
                         bgcolor: active ? tone : tone,
                       }}
@@ -270,8 +323,8 @@ export default function Incidents() {
 
                     <Typography
                       sx={{
-                        fontWeight: 700,
-                        fontSize: 13,
+                        fontWeight: 500,
+                        fontSize: 12,
                         color: active ? tone : "#64748B",
                       }}
                     >
@@ -280,16 +333,16 @@ export default function Incidents() {
 
                     <Box
                       sx={{
-                        minWidth: 22,
-                        height: 22,
-                        px: 0.6,
+                        minWidth: 18,
+                        height: 18,
+                        px: 0.45,
                         borderRadius: "999px",
                         bgcolor: "#EEF2F7",
                         display: "flex",
                         alignItems: "center",
                         justifyContent: "center",
-                        fontSize: 11.5,
-                        fontWeight: 700,
+                        fontSize: 10.25,
+                        fontWeight: 500,
                         color: "#64748B",
                       }}
                     >
@@ -298,13 +351,13 @@ export default function Incidents() {
                   </Box>
                 }
                 onClick={() => setFilter(item.key as FilterKey)}
-                sx={{
-                  height: 34,
-                  px: 0.35,
-                  borderRadius: 999,
-                  fontWeight: 800,
-                  fontSize: 12.5,
-                  bgcolor: active ? toneBg : "#fff",
+                  sx={{
+                    height: 30,
+                    px: 0.2,
+                    borderRadius: 999,
+                    fontWeight: 500,
+                    fontSize: 11.5,
+                    bgcolor: active ? toneBg : "#fff",
                   color: active ? tone : "#64748B",
                   border: active ? `1px solid ${tone}` : "1px solid rgba(226,232,240,.95)",
                   boxShadow: "0 6px 16px rgba(15,23,42,.06)",
@@ -313,7 +366,7 @@ export default function Incidents() {
                     bgcolor: active ? toneBg : "#fff",
                   },
                   "& .MuiChip-label": {
-                    px: 1.25,
+                    px: 0.9,
                   },
                 }}
               />
@@ -470,7 +523,7 @@ export default function Incidents() {
               borderBottom: "1px solid #EDF2F7",
             }}
           >
-            <Typography sx={{ fontSize: 13.5, fontWeight: 700, color: "#64748B" }}>
+            <Typography sx={{ fontSize: 13.5, fontWeight: 500, color: "#64748B" }}>
               <Box component="span" sx={{ color: "var(--text-strong)" }}>
                 {filteredIncidents.length}
               </Box>{" "}
@@ -521,7 +574,7 @@ export default function Incidents() {
                           fontSize: 12,
                           color: "#B1BBCB",
                           letterSpacing: "0.08em",
-                          fontWeight: 800,
+                          fontWeight: 500,
                           borderBottom: "1px solid #EDF2F7",
                           width: column.width,
                           whiteSpace: "nowrap",
@@ -539,17 +592,18 @@ export default function Incidents() {
                       <Box
                         component="tr"
                         key={incident.number}
-                        sx={{
+                      sx={{
                           "&:hover": { bgcolor: "#FBFDFF" },
                           cursor: "pointer",
                           borderBottom: "1px solid #F1F5F9",
                           "& td": {
                             fontSize: 13.5,
+                            fontWeight: 400,
                           },
                         }}
                         onClick={() => openIncident(incident.number)}
                       >
-                          <Box component="td" sx={{ px: 0.85, py: 1.15, fontWeight: 900, color: "#0F172A", fontSize: 18, letterSpacing: "-0.03em", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                          <Box component="td" sx={{ px: 0.85, py: 1.15, fontWeight: 500, color: "#0F172A", fontSize: 18, letterSpacing: "-0.03em", fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
                             {incident.number}
                           </Box>
                           <Box component="td" sx={{ px: 0.85, py: 1.15 }}>
@@ -562,7 +616,7 @@ export default function Incidents() {
                                 borderRadius: 999,
                                 bgcolor: "#F3F4F6",
                                 color: "#111827",
-                                fontWeight: 800,
+                                fontWeight: 500,
                                 fontSize: 12.5,
                                 whiteSpace: "nowrap",
                                 maxWidth: "100%",
@@ -587,7 +641,7 @@ export default function Incidents() {
                                 icon={<Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: p.dot, ml: 0.75 }} />}
                                 sx={{
                                   borderRadius: 999,
-                                  fontWeight: 800,
+                                  fontWeight: 500,
                                   fontSize: 11.5,
                                   height: 28,
                                   bgcolor: p.bg,
@@ -600,34 +654,16 @@ export default function Incidents() {
                         </Box>
                         <Box component="td" sx={{ px: 0.85, py: 1.15 }}>
                           <Chip
-                            label={
-                              incident.state.toLowerCase().includes("progress")
-                                ? "In Progress"
-                                : incident.state.toLowerCase().includes("resolve")
-                                  ? "Resolved"
-                                  : "New"
-                            }
+                            label={incidentStatusLabel(incident.state)}
                             size="small"
                             icon={<Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: "currentColor", ml: 0.75 }} />}
                             sx={{
                               borderRadius: 999,
-                              fontWeight: 800,
+                              fontWeight: 500,
                               fontSize: 11.5,
                               height: 28,
-                              bgcolor: statusPillPalette(
-                                incident.state.toLowerCase().includes("progress")
-                                  ? "In Progress"
-                                  : incident.state.toLowerCase().includes("resolve")
-                                    ? "Resolved"
-                                    : "New"
-                              ).bg,
-                              color: statusPillPalette(
-                                incident.state.toLowerCase().includes("progress")
-                                  ? "In Progress"
-                                  : incident.state.toLowerCase().includes("resolve")
-                                    ? "Resolved"
-                                    : "New"
-                              ).fg,
+                              bgcolor: incidentStatusPalette(incident.state).bg,
+                              color: incidentStatusPalette(incident.state).fg,
                               "& .MuiChip-icon": {
                                 color: "inherit",
                               },
@@ -643,7 +679,7 @@ export default function Incidents() {
                             size="small"
                             icon={<Box component="span" sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: inv.dot, ml: 0.75 }} />}
                             sx={{
-                              fontWeight: 800,
+                              fontWeight: 500,
                               fontSize: 11.5,
                               height: 28,
                               maxWidth: "100%",
@@ -656,7 +692,7 @@ export default function Incidents() {
                             );
                           })()}
                         </Box>
-                        <Box component="td" sx={{ px: 0.85, py: 1.15, color: "#A7B4C8", fontSize: 12.25, lineHeight: 1.3, wordBreak: "break-word" }}>
+                        <Box component="td" sx={{ px: 0.85, py: 1.15, color: "#A7B4C8", fontSize: 12.25, lineHeight: 1.3, wordBreak: "break-word", fontWeight: 400 }}>
                           {new Date(
                             (incident as Incident & { opened_at?: string }).opened_at ??
                               new Date().toISOString()
@@ -668,7 +704,7 @@ export default function Incidents() {
                             minute: "2-digit",
                           })}
                         </Box>
-                        <Box component="td" sx={{ px: 0.85, py: 1.15, color: "#111827", fontSize: 13, lineHeight: 1.3 }}>
+                        <Box component="td" sx={{ px: 0.85, py: 1.15, color: "#111827", fontSize: 13, lineHeight: 1.3, fontWeight: 400 }}>
                           {incident.short_description || "-"}
                         </Box>
                       </Box>
@@ -690,7 +726,7 @@ export default function Incidents() {
               borderTop: "1px solid #EDF2F7",
             }}
           >
-            <Typography sx={{ color: "#B2BED1", fontWeight: 600, fontSize: 14.5 }}>
+            <Typography sx={{ color: "#B2BED1", fontWeight: 400, fontSize: 14.5 }}>
               Showing {filteredIncidents.length} of {incidents.length} incidents
             </Typography>
 
@@ -703,7 +739,7 @@ export default function Incidents() {
                 "& .MuiPaginationItem-root": {
                   minWidth: 34,
                   height: 34,
-                  fontWeight: 700,
+                  fontWeight: 500,
                   color: "#94A3B8",
                   borderColor: "#D7DFEA",
                 },

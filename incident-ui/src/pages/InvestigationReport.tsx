@@ -12,14 +12,35 @@ import {
   Stack,
 } from "@mui/material";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
-import ShareOutlinedIcon from "@mui/icons-material/ShareOutlined";
-import PictureAsPdfOutlinedIcon from "@mui/icons-material/PictureAsPdfOutlined";
-import BoltRoundedIcon from "@mui/icons-material/BoltRounded";
+import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import AppsIcon from "@mui/icons-material/Apps";
 import DnsOutlinedIcon from "@mui/icons-material/DnsOutlined";
 import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
+import AdjustOutlinedIcon from "@mui/icons-material/AdjustOutlined";
+import ChecklistOutlinedIcon from "@mui/icons-material/ChecklistOutlined";
+import AltRouteOutlinedIcon from "@mui/icons-material/AltRouteOutlined";
+import {
+  FileText,
+  BarChart3,
+  Rocket,
+  Boxes,
+  Network,
+  BoxesIcon,
+  Server,
+  CalendarRange,
+  Globe,
+  Shield,
+  Settings2,
+  Workflow,
+  Search,
+  Activity,
+} from "lucide-react";
 
-import { getInvestigation } from "../services/investigationService";
+import {
+  getInvestigation,
+  getSimilarIncidents,
+  type SimilarIncident,
+} from "../services/investigationService";
 const API = "http://localhost:8000";
 
 type AnyObj = Record<string, any>;
@@ -30,6 +51,7 @@ export default function InvestigationReport() {
   const [job, setJob] = useState<AnyObj | null>(null);
   const [incidentPayload, setIncidentPayload] = useState<AnyObj | null>(null);
   const [loading, setLoading] = useState(true);
+  const [similarIncidents, setSimilarIncidents] = useState<SimilarIncident[]>([]);
 
   useEffect(() => {
     let mounted = true;
@@ -46,6 +68,36 @@ export default function InvestigationReport() {
     }
 
     load();
+    return () => {
+      mounted = false;
+    };
+  }, [investigationId]);
+
+  useEffect(() => {
+    if (!investigationId) return;
+
+    let mounted = true;
+
+    async function loadSimilarIncidents() {
+      try {
+        const incidents = await getSimilarIncidents(investigationId);
+
+        console.log("SIMILAR INCIDENTS:", incidents);
+
+        if (mounted) {
+          setSimilarIncidents(incidents);
+        }
+      } catch (err) {
+        console.error("Failed to load similar incidents:", err);
+
+        if (mounted) {
+          setSimilarIncidents([]);
+        }
+      }
+    }
+
+    loadSimilarIncidents();
+
     return () => {
       mounted = false;
     };
@@ -194,9 +246,9 @@ export default function InvestigationReport() {
 
             <SectionHeader
               step="03"
-              tag="DIAGNOSTIC TRAIL"
+              tag="COMPONENT-BY-COMPONENT"
               title="Technical Investigation"
-              subtitle="Subsystems inspected in parallel."
+              subtitle="14 subsystems inspected in parallel. Click any card to drill into evidence."
             />
 
             <TechnicalInvestigationSection data={data} />
@@ -210,24 +262,34 @@ export default function InvestigationReport() {
             <SectionHeader step="04" tag="SYSTEM TOPOLOGY" title="Infrastructure Health Map" subtitle="11 of 12 systems investigated. Skipped systems were healthy at query time." />
             <InfrastructureSection data={data} />
 
-            <SectionHeader step="05" tag="SHOW YOUR WORK" title="Evidence Explorer" subtitle="Raw signals grouped by component. Every conclusion is traceable." />
-            <EvidenceExplorerSection data={data} />
-
-            <SectionHeader step="06" tag="CHRONOLOGY" title="Investigation Timeline" subtitle="Every signal, action, and inference in order." />
+            <SectionHeader
+              step="05"
+              tag="CHRONOLOGY"
+              title="Investigation Timeline"
+              subtitle="Trace the incident from the first known issue through investigation, root cause and recovery planning."
+            />
             <TimelineSection data={data} />
 
-            <SectionHeader step="07" tag="FIX NOW" title="Recovery Actions" subtitle="Prioritized, runnable steps to restore service." />
+            <SectionHeader
+              step="06"
+              tag="FIX NOW"
+              title="Recovery Actions"
+              subtitle="Prioritized, runnable steps to restore service."
+            />
             <RecoveryActionsSection data={data} />
 
-            <SectionHeader step="08" tag="PREVENT THE NEXT ONE" title="Recommendations" subtitle="Immediate, preventive, and long-term work broken out for planning." />
-            <RecommendationsSection data={data} />
-
-            <SectionHeader step="09" tag="PATTERN INTELLIGENCE" title="Similar Incidents" subtitle="Historical incidents with matching signatures, ranked by similarity." />
-            <SimilarIncidentsSection data={data} />
+            <SectionHeader
+              step="07"
+              tag="PATTERN INTELLIGENCE"
+              title="Similar Incidents"
+              subtitle="Historical incidents with matching signatures, ranked by similarity."
+            />
+            <SimilarIncidentsSection
+              data={data}
+              rows={similarIncidents}
+            />
           </>
         )}
-
-        {!isFailed && <FooterSection data={data} />}
       </Container>
     </Box>
   );
@@ -239,7 +301,7 @@ function TopBar({ navigate }: { navigate: (path: string) => void }) {
       <Button startIcon={<ArrowBackIcon />} onClick={() => navigate("/incidents")} sx={{ textTransform: "none", color: "#334155", fontWeight: 700 }}>
         Incidents
       </Button>
-      </Box>
+    </Box>
   );
 }
 
@@ -317,19 +379,24 @@ function SectionHeader({
   tag,
   title,
   subtitle,
+  rightSlot,
 }: {
   step: string;
   tag: string;
   title: string;
   subtitle: string;
+  rightSlot?: React.ReactNode;
 }) {
   return (
     <Box sx={{ mt: 4.5 }}>
-      <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
-        <Chip label={step} size="small" sx={{ fontWeight: 800, height: 26, "& .MuiChip-label": { px: 1 } }} />
-        <Typography sx={{ fontSize: 10.5, letterSpacing: "0.08em", color: "#64748B", fontWeight: 700 }}>
-          {tag}
-        </Typography>
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexWrap: "wrap" }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.2 }}>
+          <Chip label={step} size="small" sx={{ fontWeight: 800, height: 26, "& .MuiChip-label": { px: 1 } }} />
+          <Typography sx={{ fontSize: 10.5, letterSpacing: "0.08em", color: "#64748B", fontWeight: 700 }}>
+            {tag}
+          </Typography>
+        </Box>
+        {rightSlot}
       </Box>
       <Typography sx={{ mt: 0.5, fontSize: { xs: 18, md: 22 }, lineHeight: 1.06, fontWeight: 800, letterSpacing: "-0.04em", color: "#111827" }}>
         {title}
@@ -342,66 +409,133 @@ function SectionHeader({
 }
 
 function ExecutiveSummarySection({ data }: { data: AnyObj }) {
+  const confidence = normalizeConfidence(data.heroConfidence);
+  const severity = formatSeverity(data.severity);
+  const risk = formatRisk(data.risk, confidence, severity);
+
   return (
     <Paper sx={{ mt: 2, p: { xs: 2, md: 2.25 }, borderRadius: 4 }}>
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.45fr 1fr" }, gap: 1.5 }}>
         <SectionCard title="ROOT CAUSE" accent="red" large>
-          {data.executiveRootCause}
+          <Box sx={{ display: "grid", gap: 1.6 }}>
+            <Typography sx={{ color: "#111827", fontSize: { xs: 15, md: 16 }, lineHeight: 1.55 }}>
+              {data.executiveRootCause}
+            </Typography>
+            <Box sx={{ pt: 1.6, borderTop: "1px solid #E5E7EB" }}>
+              <MiniInfoCard label="BUSINESS IMPACT" value={data.businessImpact} />
+            </Box>
+          </Box>
         </SectionCard>
         <SectionCard title="CONFIDENCE">
           <Box>
             <Typography sx={{ fontSize: { xs: 44, md: 48 }, fontWeight: 800, lineHeight: 1, color: "#1E3A8A" }}>
-              {data.heroConfidence == null ? "-" : data.heroConfidence}
+              {confidence == null ? "-" : confidence}
               <Typography component="span" sx={{ fontSize: 18, color: "#94A3B8" }}>
                 %
               </Typography>
             </Typography>
             <Box sx={{ mt: 1.25, height: 8, borderRadius: 999, bgcolor: "#E5E7EB", overflow: "hidden" }}>
-              <Box sx={{ width: `${data.heroConfidence == null ? 0 : data.heroConfidence}%`, height: "100%", bgcolor: "#1E3A8A" }} />
+              <Box sx={{ width: `${confidence == null ? 0 : confidence}%`, height: "100%", bgcolor: "#1E3A8A" }} />
             </Box>
             <Typography sx={{ mt: 1, color: "#6B7280", fontSize: 12.5, lineHeight: 1.35 }}>
               High confidence - evidence is deterministic and reproducible.
             </Typography>
-            <Box sx={{ mt: 1.5, display: "grid", gap: 0.75 }}>
-              <DetailLine label="Severity" value={data.severity} />
-              <DetailLine label="Owner" value={data.owner} />
-              <DetailLine label="Risk" value={data.risk} />
+            <Box sx={{ mt: 1.8, display: "grid", gap: 0.95 }}>
+              <MetricLine label="Severity" value={severity} tone="severity" />
+              <MetricLine label="Risk" value={risk} tone="risk" />
             </Box>
           </Box>
         </SectionCard>
-      </Box>
-
-      <Box sx={{ mt: 1.5, display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" }, gap: 1.5 }}>
-        <SectionCard title="BUSINESS IMPACT">{data.businessImpact}</SectionCard>
-        <SectionCard title="CURRENT STATUS">{data.currentStatus}</SectionCard>
       </Box>
     </Paper>
   );
 }
 
 function AIInvestigationSection({ data }: { data: AnyObj }) {
+  const reasoning = normalizeReasoningSteps(data.reasoning);
+  const failurePoint = formatFailurePoint(data);
+  const alternatives = normalizeAlternativeExclusions(data.alternatives, data);
+
   return (
     <Box sx={{ mt: 2, display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.55fr 1fr" }, gap: 1.5 }}>
       <Paper sx={{ p: 1.75, borderRadius: 4 }}>
-        <Typography sx={{ ...panelHeadingSx, fontSize: 11 }}>Reasoning Chain</Typography>
-        <Typography sx={{ ...panelSubSx, fontSize: 12 }}>Sequential steps from signal ingest to root cause</Typography>
-        <Box sx={{ mt: 1.5 }}>
-          {(data.reasoning || []).slice(0, 6).map((item: AnyObj | string, index: number) => (
-            <Box key={index} sx={{ display: "grid", gridTemplateColumns: "24px 1fr", gap: 1.25, mb: 1.6 }}>
-              <StepCircle>{index + 1}</StepCircle>
-              <Box>
-                <Typography sx={{ fontWeight: 700, color: "#111827", fontSize: 13 }}>
-                  {typeof item === "string" ? item : item.title || item.label || item.summary || "Reasoning step"}
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.25 }}>
+          <Box
+            sx={{
+              width: 46,
+              height: 46,
+              borderRadius: 3,
+              bgcolor: "#1F2F57",
+              color: "#FFFFFF",
+              display: "grid",
+              placeItems: "center",
+              flexShrink: 0,
+            }}
+          >
+            <ChecklistOutlinedIcon sx={{ fontSize: 21 }} />
+          </Box>
+          <Box>
+            <Typography sx={{ fontSize: 14, fontWeight: 800, color: "#111827", lineHeight: 1.1 }}>
+              Reasoning Chain
+            </Typography>
+            <Typography sx={{ mt: 0.35, color: "#6B7280", fontSize: 11.5, lineHeight: 1.2 }}>
+              Sequential steps from signal ingest to root cause
+            </Typography>
+          </Box>
+        </Box>
+        <Box sx={{ mt: 1.5, display: "grid", gap: 1 }}>
+          {reasoning.map((item, index) => (
+            <Box
+              key={`${item.title}-${index}`}
+              sx={{
+                display: "grid",
+                gridTemplateColumns: "30px 1fr",
+                gap: 1,
+                alignItems: "start",
+              }}
+            >
+              <Box sx={{ pt: 0.45, display: "flex", justifyContent: "center" }}>
+                <Box
+                  sx={{
+                    width: 20,
+                    height: 20,
+                    borderRadius: "50%",
+                    bgcolor: index === reasoning.length - 1 ? "#1E3A8A" : "#E2E8F0",
+                    color: index === reasoning.length - 1 ? "#FFFFFF" : "#475569",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 11,
+                    fontWeight: 800,
+                    lineHeight: 1,
+                    boxShadow: "0 1px 2px rgba(15, 23, 42, 0.08)",
+                  }}
+                >
+                  {index + 1}
+                </Box>
+              </Box>
+              <Box
+                sx={{
+                  p: 1.35,
+                  borderRadius: 3,
+                  bgcolor: index === reasoning.length - 1 ? "#EEF4FF" : "#FCFDFE",
+                  border: "1px solid #E7ECF3",
+                }}
+              >
+                <Typography sx={{ fontWeight: 750, color: "#111827", fontSize: 13, lineHeight: 1.35 }}>
+                  {item.title}
                 </Typography>
-                <Typography sx={{ color: "#6B7280", lineHeight: 1.35, mt: 0.1, fontSize: 12.5 }}>
-                  {typeof item === "string" ? "" : item.detail || item.summary || item.description || ""}
-                </Typography>
+                {item.detail && (
+                  <Typography sx={{ color: "#64748B", lineHeight: 1.45, mt: 0.35, fontSize: 12.25 }}>
+                    {item.detail}
+                  </Typography>
+                )}
               </Box>
             </Box>
           ))}
         </Box>
         <Paper sx={{ mt: 1.75, p: 1.5, borderRadius: 3, bgcolor: "#FAFBFC" }}>
-          <Typography sx={{ ...panelHeadingSx, fontSize: 11 }}>Why we're confident</Typography>
+          <HeaderLabel icon={<ChecklistOutlinedIcon sx={{ fontSize: 16 }} />} text="Why we're confident" />
           <Box sx={{ mt: 1, display: "grid", gap: 0.85 }}>
             {(data.confidenceReasons || []).map((item: string, index: number) => (
               <Bullet key={index}>{item}</Bullet>
@@ -412,28 +546,47 @@ function AIInvestigationSection({ data }: { data: AnyObj }) {
 
       <Box sx={{ display: "grid", gap: 1.5 }}>
         <Paper sx={{ p: 1.75, borderRadius: 4 }}>
-          <Typography sx={{ ...panelHeadingSx, fontSize: 11 }}>Failure Point</Typography>
+          <HeaderLabel icon={<AdjustOutlinedIcon sx={{ fontSize: 16 }} />} text="Failure Point" />
           <Box sx={{ mt: 1.1, p: 1.5, borderRadius: 3, bgcolor: "#F3F4F6", fontFamily: "monospace", fontSize: 12.5, color: "#111827" }}>
-            {data.failurePoint}
+            {failurePoint}
           </Box>
         </Paper>
         <Paper sx={{ p: 1.75, borderRadius: 4 }}>
-          <Typography sx={{ ...panelHeadingSx, fontSize: 11 }}>Primary Evidence</Typography>
-          <Box sx={{ mt: 1, display: "grid", gap: 0.8 }}>
-            {(data.primaryEvidence || []).map((item: string, index: number) => (
-              <Bullet key={index}>{item}</Bullet>
-            ))}
-          </Box>
-        </Paper>
-        <Paper sx={{ p: 1.75, borderRadius: 4 }}>
-          <Typography sx={{ ...panelHeadingSx, fontSize: 11 }}>Alternatives Ruled Out</Typography>
-          <Box sx={{ mt: 1, display: "grid", gap: 0.85 }}>
-            {(data.alternatives || []).map((item: AnyObj, index: number) => (
-              <Box key={index} sx={{ borderLeft: "2px solid #E5E7EB", pl: 1.6 }}>
-                <Typography sx={{ fontWeight: 700, color: "#111827", fontSize: 13 }}>{item.title || item}</Typography>
-                <Typography sx={{ color: "#6B7280", fontSize: 12.5, mt: 0.2 }}>{item.reason || ""}</Typography>
+          <HeaderLabel icon={<ChecklistOutlinedIcon sx={{ fontSize: 16 }} />} text="Primary Evidence" />
+          <Box sx={{ mt: 1, display: "grid", gap: 0.6 }}>
+            {normalizePrimaryEvidence(data.primaryEvidence, data).map((item, index) => (
+              <Box key={`${item}-${index}`} sx={{ display: "grid", gridTemplateColumns: "18px 1fr", gap: 1, alignItems: "start" }}>
+                <Box sx={{ mt: 0.95, width: 8, height: 8, borderRadius: "50%", bgcolor: "#1E3A8A" }} />
+                <Typography
+                  sx={{
+                    fontFamily: '"SFMono-Regular", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                    fontSize: 14,
+                    lineHeight: 1.6,
+                    color: "#111827",
+                    whiteSpace: "pre-wrap",
+                  }}
+                >
+                  {item}
+                </Typography>
               </Box>
             ))}
+          </Box>
+        </Paper>
+        <Paper sx={{ p: 1.75, borderRadius: 4 }}>
+          <HeaderLabel icon={<AltRouteOutlinedIcon sx={{ fontSize: 16 }} />} text="Alternatives Ruled Out" />
+          <Box sx={{ mt: 1, display: "grid", gap: 0.85 }}>
+            {alternatives.length ? (
+              alternatives.map((item, index) => (
+                <Box key={`${item.title}-${index}`} sx={{ borderLeft: "2px solid #E5E7EB", pl: 1.6 }}>
+                  <Typography sx={{ fontWeight: 700, color: "#111827", fontSize: 13 }}>{item.title}</Typography>
+                  <Typography sx={{ color: "#6B7280", fontSize: 12.5, mt: 0.2 }}>{item.reason}</Typography>
+                </Box>
+              ))
+            ) : (
+              <Typography sx={{ color: "#6B7280", fontSize: 12.5 }}>
+                No alternative root causes were retained after the evidence review.
+              </Typography>
+            )}
           </Box>
         </Paper>
       </Box>
@@ -442,89 +595,207 @@ function AIInvestigationSection({ data }: { data: AnyObj }) {
 }
 
 function TechnicalInvestigationSection({ data }: { data: AnyObj }) {
-  const cards = [
-    data.logsTitle && {
-      title: data.logsTitle,
-      summary: data.logsSummary,
-      count: data.logsCount,
-      state: "Healthy",
+  const cards = buildTechnicalCards(data);
+  const counts = cards.reduce(
+    (acc, card) => {
+      acc[card.state as "Problem" | "Warning" | "Healthy"] += 1;
+      return acc;
     },
-    data.metricsTitle && {
-      title: data.metricsTitle,
-      summary: data.metricsSummary,
-      count: data.metricsCount,
-      state: "Healthy",
-    },
-    data.deploymentsTitle && {
-      title: data.deploymentsTitle,
-      summary: data.deploymentsSummary,
-      count: data.deploymentsCount,
-      state: "Healthy",
-    },
-    data.kubernetesTitle && {
-      title: data.kubernetesTitle,
-      summary: data.kubernetesSummary,
-      count: data.kubernetesCount,
-      state: "Healthy",
-    },
-    data.networkTitle && {
-      title: data.networkTitle,
-      summary: data.networkSummary,
-      count: data.networkCount,
-      state: "Healthy",
-    },
-    data.depsTitle && {
-      title: data.depsTitle,
-      summary: data.depsSummary,
-      count: data.depsCount,
-      state: "Healthy",
-    },
-  ].filter(Boolean);
+    { Problem: 0, Warning: 0, Healthy: 0 }
+  );
 
   return (
     <Box sx={{ mt: 2 }}>
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(4, 1fr)" }, gap: 1.4 }}>
-        {cards.map((card: AnyObj, index: number) => (
-          <InvestigationCard
-            key={index}
-            title={card.title}
-            summary={card.summary}
-            count={String(card.count)}
-            state={card.state}
-          />
+      <Box sx={{ mt: 2.2, display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(4, 1fr)" }, gap: 1.25 }}>
+        {cards.map((card, index) => (
+          <TechnicalCard key={index} title={card.title} summary={card.summary} state={card.state} icon={card.icon} />
         ))}
       </Box>
     </Box>
   );
 }
 
+function buildTechnicalCards(data: AnyObj) {
+  return [
+    { title: data.logsTitle || "Logs", summary: data.logsSummary || "-", state: inferTechState(data.logsSummary, data.logsCount, "logs"), icon: <FileText size={18} /> },
+    { title: data.metricsTitle || "Metrics", summary: data.metricsSummary || "-", state: inferTechState(data.metricsSummary, data.metricsCount, "metrics"), icon: <BarChart3 size={18} /> },
+    { title: data.deploymentsTitle || "Deployments", summary: data.deploymentsSummary || "-", state: inferTechState(data.deploymentsSummary, data.deploymentsCount, "deployment"), icon: <Rocket size={18} /> },
+    { title: data.kubernetesTitle || "Kubernetes", summary: data.kubernetesSummary || "-", state: inferTechState(data.kubernetesSummary, data.kubernetesCount, "kubernetes"), icon: <Boxes size={18} /> },
+    { title: data.networkTitle || "Ingress / Gateway", summary: data.networkSummary || "-", state: inferTechState(data.networkSummary, data.networkCount, "network"), icon: <Network size={18} /> },
+    { title: "Pods", summary: data.kubernetesSummary || "Pod readiness checked", state: inferTechState(data.kubernetesSummary, data.kubernetesCount, "pods"), icon: <Server size={18} /> },
+    { title: "Services", summary: data.networkSummary || "Service endpoints checked", state: inferTechState(data.networkSummary, data.networkCount, "services"), icon: <Workflow size={18} /> },
+    { title: "Events", summary: data.failurePoint || "No major events", state: inferTechState(data.logsSummary, data.logsCount, "events"), icon: <CalendarRange size={18} /> },
+    { title: "DNS", summary: data.depsSummary || "Dependency path reviewed", state: inferTechState(data.depsSummary, data.depsCount, "dns"), icon: <Search size={18} /> },
+    { title: "Config", summary: data.deploymentsSummary || "Rollout checked", state: inferTechState(data.deploymentsSummary, data.deploymentsCount, "config"), icon: <Settings2 size={18} /> },
+    { title: "Dependencies", summary: data.depsSummary || "-", state: inferTechState(data.depsSummary, data.depsCount, "deps"), icon: <BoxesIcon size={18} /> },
+    { title: "Security", summary: data.knowledgeTitle || "No policy flags", state: inferTechState(data.knowledge?.found ? "healthy" : "warning", data.knowledge?.matches?.length || 0, "security"), icon: <Shield size={18} /> },
+  ] as Array<{
+    title: string;
+    summary: string;
+    state: "Problem" | "Warning" | "Healthy";
+    icon: React.ReactNode;
+  }>;
+}
+
+function inferTechState(summary: unknown, count: number, kind: string) {
+  const text = String(summary || "").toLowerCase();
+  if (
+    text.includes("degraded") ||
+    text.includes("outofsync") ||
+    text.includes("not found") ||
+    text.includes("mismatch") ||
+    text.includes("0 endpoints") ||
+    text.includes("error") ||
+    text.includes("failed") ||
+    text.includes("unhealthy") ||
+    text.includes("not attached") ||
+    text.includes("missing")
+  ) {
+    return "Problem";
+  }
+  if (
+    text.includes("warning") ||
+    text.includes("partial") ||
+    text.includes("drift") ||
+    text.includes("change") ||
+    text.includes("rolled out") ||
+    text.includes("inspected") ||
+    (kind === "security" && count > 0)
+  ) {
+    return "Warning";
+  }
+  if (count > 0 || text.includes("healthy") || text.includes("ready") || text.includes("pass")) {
+    return "Healthy";
+  }
+  return "Warning";
+}
+
+function StatusSummaryPill({
+  label,
+  tone,
+}: {
+  label: string;
+  tone: "problem" | "warning" | "healthy";
+}) {
+  const colors = {
+    problem: { bg: "#FFF1F2", fg: "#DC2626", dot: "#EF4444" },
+    warning: { bg: "#FFFBEB", fg: "#B45309", dot: "#F59E0B" },
+    healthy: { bg: "#F0FDF4", fg: "#15803D", dot: "#22C55E" },
+  }[tone];
+
+  return (
+    <Box
+      sx={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 1,
+        px: 1.5,
+        py: 0.8,
+        borderRadius: 999,
+        border: "1px solid #E5E7EB",
+        bgcolor: "#FFFFFF",
+        boxShadow: "0 1px 2px rgba(15,23,42,0.04)",
+      }}
+    >
+      <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: colors.dot }} />
+      <Typography sx={{ fontSize: 12.5, fontWeight: 700, color: "#111827" }}>{label}</Typography>
+    </Box>
+  );
+}
+
+function TechnicalCard({
+  title,
+  summary,
+  state,
+  icon,
+}: {
+  title: string;
+  summary: string;
+  count?: number;
+  state: "Problem" | "Warning" | "Healthy";
+  icon: React.ReactNode;
+}) {
+  const accent =
+    state === "Problem" ? "#EF4444" : state === "Warning" ? "#EAB308" : "#16A34A";
+  const softBg =
+    state === "Problem" ? "#FFF5F5" : state === "Warning" ? "#FFFBEB" : "#F0FDF4";
+
+  return (
+    <Paper
+      sx={{
+        p: 1.25,
+        borderRadius: 4,
+        borderLeft: `4px solid ${accent}`,
+        minHeight: 124,
+        boxShadow: "0 10px 24px rgba(15,23,42,0.06)",
+      }}
+    >
+      <Box sx={{ display: "flex", alignItems: "start", justifyContent: "space-between", gap: 2 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.1 }}>
+          <Box
+            sx={{
+              width: 28,
+              height: 28,
+              borderRadius: 2,
+              bgcolor: softBg,
+              color: accent,
+              display: "grid",
+              placeItems: "center",
+              "& svg": { display: "block" },
+              flexShrink: 0,
+            }}
+          >
+            {icon}
+          </Box>
+          <Typography sx={{ fontSize: 13.25, fontWeight: 700, color: "#111827", lineHeight: 1.15 }}>{title}</Typography>
+        </Box>
+        <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: accent, mt: 0.35 }} />
+      </Box>
+
+      <Typography sx={{ mt: 0.8, color: "#4B5563", fontSize: 11.75, lineHeight: 1.35, minHeight: 32 }}>
+        {summary}
+      </Typography>
+
+      <Box
+        sx={{
+          mt: 1.1,
+          display: "flex",
+          justifyContent: "flex-end",
+        }}
+      >
+        <Typography sx={{ color: accent, fontSize: 12, fontWeight: 600, lineHeight: 1.2 }}>
+          {state}
+        </Typography>
+      </Box>
+    </Paper>
+  );
+}
+
 function InfrastructureSection({ data }: { data: AnyObj }) {
-  const tiles = data.infrastructure ?? [
-    ["ServiceNow", "ITSM", data.servicenowStatus, data.servicenowMetric, "Skipped"],
-    ["Grafana", "Observability", data.grafanaStatus, data.grafanaMetric, "Investigated"],
-    ["Loki", "Logs", data.lokiStatus, data.lokiMetric, "Investigated"],
-    ["Prometheus", "Metrics", data.prometheusStatus, data.prometheusMetric, "Investigated"],
-    ["Kubernetes API", "Orchestration", data.k8sApiStatus, data.k8sApiMetric, "Investigated"],
-    ["ArgoCD", "GitOps", data.argocdStatus, data.argocdMetric, "Investigated"],
-    [data.applicationName, "Application", data.applicationStatus, data.applicationMetric, "Investigated"],
-    [data.ingressGatewayName, "Network", data.ingressGatewayMetric, data.ingressGatewayScore, "Investigated"],
-    [data.dbName, "Database", data.dbMetric, data.dbScore, "Investigated"],
-    [data.paymentsApiName, "Dependency", data.paymentsMetric, data.paymentsScore, "Investigated"],
-    [data.authSvcName, "Dependency", data.authMetric, data.authScore, "Investigated"],
-    [data.s3Name, "Storage", data.s3Metric, data.s3Score, "Investigated"],
-  ];
+  const tiles = buildInfrastructureTiles(data);
+  const databaseCard = buildDatabaseCard(data);
 
   return (
     <Paper sx={{ mt: 2, p: 1.5, borderRadius: 4 }}>
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(4, 1fr)" }, gap: 1.2 }}>
+        <DatabaseCard
+          name={databaseCard.name}
+          type={databaseCard.type}
+          metric={databaseCard.metric}
+          score={databaseCard.score}
+          status={databaseCard.status}
+          healthy={databaseCard.healthy}
+        />
+
         {tiles.map((item: AnyObj, index: number) => (
           <TopologyTile
             key={index}
             name={item.name}
             type={item.type}
             metric={item.metric}
-            score=""
+            score={item.score}
             status={item.status}
+            tone={item.tone}
           />
         ))}
       </Box>
@@ -532,53 +803,394 @@ function InfrastructureSection({ data }: { data: AnyObj }) {
   );
 }
 
-function EvidenceExplorerSection({ data }: { data: AnyObj }) {
-  const tabs = ["Logs", "Metrics", "Deployments", "Kubernetes", "Ingress / Gateway", "Pods", "Services", "Events"];
-  return (
-    <Paper sx={{ mt: 2, p: 0, borderRadius: 4, overflow: "hidden" }}>
-      <Box sx={{ px: 2, pt: 1.4, borderBottom: "1px solid #E5E7EB", display: "flex", gap: 1.5, flexWrap: "wrap" }}>
-        {tabs.map((tab, index) => (
-          <Chip key={tab} label={tab} color={index === 0 ? "primary" : "default"} sx={{ mb: 1.3 }} />
-        ))}
-      </Box>
-      <Box sx={{ p: 2.5 }}>
-        <Typography sx={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>
-          {data.evidenceHeadline}
-        </Typography>
-        <Typography sx={{ color: "#6B7280", mt: 0.3 }}>
-          {data.evidenceSubhead}
-        </Typography>
-        <Paper sx={{ mt: 2, p: 2, borderRadius: 3, bgcolor: "#050816", color: "#E5E7EB", fontFamily: "monospace" }}>
-          {(data.evidenceLines || []).slice(0, 3).map((line: string, index: number) => (
-            <Typography key={index} sx={{ whiteSpace: "pre-wrap", fontSize: 14, lineHeight: 1.8 }}>
-              {String(index + 1).padStart(2, "0")}  {line}
-            </Typography>
-          ))}
-        </Paper>
-      </Box>
-    </Paper>
+function buildDatabaseCard(data: AnyObj) {
+  const name = compactText(
+    data.dbName ||
+    data.dbTitle ||
+    data.databaseName ||
+    data.applicationName ||
+    "Database",
   );
+  const type = compactText(data.dbType || "Database");
+  const metric = compactText(
+    data.dbMetric ||
+    data.dbLatency ||
+    data.dbSummary ||
+    "",
+  );
+  const score = compactText(
+    data.dbScore ||
+    data.dbAvailability ||
+    data.dbHealth ||
+    "",
+  );
+  const status = executionLabel(
+    data.dbStatus,
+    metric,
+    score,
+  );
+  const healthy = !/skip|fail|error|problem|degrad/i.test(
+    `${data.dbStatus || ""} ${metric || ""} ${score || ""}`,
+  );
+
+  return {
+    name,
+    type,
+    metric,
+    score,
+    status,
+    healthy,
+  };
+}
+
+function buildInfrastructureTiles(data: AnyObj) {
+  if (Array.isArray(data.infrastructure) && data.infrastructure.length) {
+    return data.infrastructure
+      .map((item: AnyObj | unknown[]) => {
+        if (Array.isArray(item)) {
+          const [name, type, metric, score, status, tone] = item;
+          return {
+            name: compactText(name),
+            type: compactText(type),
+            metric: compactText(metric),
+            score: compactText(score),
+            status: executionLabel(status, metric, score),
+            tone: inferInfrastructureTone(String(tone || status || metric || score || "")),
+          };
+        }
+
+        if (item && typeof item === "object") {
+          const row = item as AnyObj;
+          return {
+            name: compactText(row.name),
+            type: compactText(row.type),
+            metric: compactText(row.metric || row.summary || row.description),
+            score: compactText(row.score || row.latency || row.availability),
+            status: executionLabel(row.status, row.metric, row.score),
+            tone: inferInfrastructureTone(String(row.tone || row.status || row.metric || row.score || "")),
+          };
+        }
+
+        return null;
+      })
+      .filter((item): item is {
+        name: string;
+        type: string;
+        metric: string;
+        score: string;
+        status: string;
+        tone: "healthy" | "warning" | "problem";
+      } => item !== null);
+  }
+
+  const serviceNowSummary = compactText(data.servicenowMetric || data.servicenowStatus || "ITSM");
+  const grafanaSummary = compactText(data.grafanaMetric || data.grafanaStatus || data.logsSummary || "Observability");
+  const lokiSummary = compactText(data.lokiMetric || data.lokiStatus || data.logsSummary || "Logs");
+  const prometheusSummary = compactText(data.prometheusMetric || data.prometheusStatus || data.metricsSummary || "Metrics");
+  const k8sSummary = compactText(data.k8sApiMetric || data.k8sApiStatus || data.kubernetesSummary || "Orchestration");
+  const argocdSummary = compactText(data.argocdMetric || data.argocdStatus || data.deploymentsSummary || "GitOps");
+  const appSummary = compactText(data.applicationMetric || data.applicationStatus || data.executiveRootCause || "Application");
+  const gatewaySummary = compactText(data.ingressGatewayMetric || data.ingressGatewayScore || data.networkSummary || "Network");
+  const paymentsSummary = compactText(data.paymentsMetric || data.paymentsScore || data.depsSummary || "Dependency");
+  const authSummary = compactText(data.authMetric || data.authScore || data.depsSummary || "Dependency");
+  const s3Summary = compactText(data.s3Metric || data.s3Score || data.depsSummary || "Storage");
+
+  return [
+    {
+      name: data.servicenowName || "ServiceNow",
+      type: "ITSM",
+      metric: serviceNowSummary,
+      score: compactText(data.servicenowScore || ""),
+      status: executionLabel(data.servicenowStatus, serviceNowSummary, data.servicenowScore),
+      tone: inferInfrastructureTone(String(data.servicenowStatus || serviceNowSummary || data.servicenowScore || "")),
+    },
+    {
+      name: data.grafanaName || "Grafana",
+      type: "Observability",
+      metric: grafanaSummary,
+      score: compactText(data.grafanaScore || ""),
+      status: executionLabel(data.grafanaStatus, grafanaSummary, data.grafanaScore),
+      tone: inferInfrastructureTone(String(data.grafanaStatus || grafanaSummary || data.grafanaScore || "")),
+    },
+    {
+      name: data.lokiName || "Loki",
+      type: "Logs",
+      metric: lokiSummary,
+      score: compactText(data.lokiScore || ""),
+      status: executionLabel(data.lokiStatus, lokiSummary, data.lokiScore),
+      tone: inferInfrastructureTone(String(data.lokiStatus || lokiSummary || data.lokiScore || "")),
+    },
+    {
+      name: data.prometheusName || "Prometheus",
+      type: "Metrics",
+      metric: prometheusSummary,
+      score: compactText(data.prometheusScore || ""),
+      status: executionLabel(data.prometheusStatus, prometheusSummary, data.prometheusScore),
+      tone: inferInfrastructureTone(String(data.prometheusStatus || prometheusSummary || data.prometheusScore || "")),
+    },
+    {
+      name: data.k8sApiName || "Kubernetes API",
+      type: "Orchestration",
+      metric: k8sSummary,
+      score: compactText(data.k8sApiScore || ""),
+      status: executionLabel(data.k8sApiStatus, k8sSummary, data.k8sApiScore),
+      tone: inferInfrastructureTone(String(data.k8sApiStatus || k8sSummary || data.k8sApiScore || "")),
+    },
+    {
+      name: data.argocdName || "ArgoCD",
+      type: "GitOps",
+      metric: argocdSummary,
+      score: compactText(data.argocdScore || ""),
+      status: executionLabel(data.argocdStatus, argocdSummary, data.argocdScore),
+      tone: inferInfrastructureTone(String(data.argocdStatus || argocdSummary || data.argocdScore || "")),
+    },
+    {
+      name: data.applicationName || "Application",
+      type: "Application",
+      metric: appSummary,
+      score: compactText(data.applicationScore || ""),
+      status: executionLabel(data.applicationStatus, appSummary, data.applicationScore),
+      tone: inferInfrastructureTone(String(data.applicationStatus || appSummary || data.applicationScore || "")),
+    },
+    {
+      name: data.ingressGatewayName || "Ingress Gateway",
+      type: "Network",
+      metric: gatewaySummary,
+      score: compactText(data.ingressGatewayScore || ""),
+      status: executionLabel(data.ingressGatewayStatus, gatewaySummary, data.ingressGatewayScore),
+      tone: inferInfrastructureTone(String(data.ingressGatewayStatus || gatewaySummary || data.ingressGatewayScore || "")),
+    },
+    {
+      name: data.paymentsApiName || "payments-api",
+      type: "Dependency",
+      metric: paymentsSummary,
+      score: compactText(data.paymentsScore || ""),
+      status: executionLabel(data.paymentsStatus, paymentsSummary, data.paymentsScore),
+      tone: inferInfrastructureTone(String(data.paymentsStatus || paymentsSummary || data.paymentsScore || "")),
+    },
+    {
+      name: data.authSvcName || "auth-svc",
+      type: "Dependency",
+      metric: authSummary,
+      score: compactText(data.authScore || ""),
+      status: executionLabel(data.authStatus, authSummary, data.authScore),
+      tone: inferInfrastructureTone(String(data.authStatus || authSummary || data.authScore || "")),
+    },
+    {
+      name: data.s3Name || "S3 assets-eu",
+      type: "Storage",
+      metric: s3Summary,
+      score: compactText(data.s3Score || ""),
+      status: executionLabel(data.s3Status, s3Summary, data.s3Score),
+      tone: inferInfrastructureTone(String(data.s3Status || s3Summary || data.s3Score || "")),
+    },
+  ];
+}
+
+function executionLabel(status: unknown, metric: unknown, score: unknown) {
+  const statusText = compactText(status);
+  if (statusText) {
+    return /skip/i.test(statusText) ? "Skipped" : "Investigated";
+  }
+
+  const text = `${metric ?? ""} ${score ?? ""}`.toLowerCase();
+  if (!text.trim()) return "Skipped";
+  return "Investigated";
+}
+
+function inferInfrastructureTone(text: string): "healthy" | "warning" | "problem" {
+  const lower = text.toLowerCase();
+  if (lower.includes("failed") || lower.includes("error") || lower.includes("problem") || lower.includes("0%") || lower.includes("0/0")) {
+    return "problem";
+  }
+  if (lower.includes("warning") || lower.includes("degraded") || lower.includes("partial") || lower.includes("62%")) {
+    return "warning";
+  }
+  return "healthy";
+}
+
+function compactText(value: unknown) {
+  return String(value ?? "")
+    .replace(/\s+/g, " ")
+    .trim();
 }
 
 function TimelineSection({ data }: { data: AnyObj }) {
+  const timeline = Array.isArray(data.timeline) ? data.timeline : [];
+  const visibleTimeline = timeline.slice(0, 6);
+
   return (
-    <Paper sx={{ mt: 2, p: 2, borderRadius: 4 }}>
-      <Box sx={{ display: "grid", gap: 2.2 }}>
-        {(data.timeline || []).slice(0, 6).map((item: AnyObj, index: number) => (
-          <Box key={index} sx={{ display: "grid", gridTemplateColumns: "88px 1fr", gap: 2 }}>
-            <Box sx={{ textAlign: "right", pr: 1 }}>
-              <Typography sx={{ fontFamily: "monospace", fontWeight: 800, fontSize: 18, color: "#111827" }}>{item.time || "—"}</Typography>
-              <Typography sx={{ fontSize: 12, color: "#6B7280" }}>UTC</Typography>
+    <Paper sx={{ mt: 2, p: 1.3, borderRadius: 3.25 }}>
+      <Box sx={{ display: "grid", gap: 1.35 }}>
+        {visibleTimeline.map((item: AnyObj, index: number) => (
+          <Box
+            key={index}
+            sx={{
+              display: "grid",
+              gridTemplateColumns: { xs: "72px 1fr", md: "92px 1fr" },
+              gap: 1.1,
+              alignItems: "start",
+            }}
+          >
+            {/* DATE + TIME */}
+            <Box sx={{ textAlign: "right", pr: 0.15 }}>
+              <Typography
+                sx={{
+                  fontFamily: "monospace",
+                  fontWeight: 800,
+                  fontSize: { xs: 11.5, md: 13 },
+                  color: "#111827",
+                  lineHeight: 1,
+                }}
+              >
+                {item.time || "—"}
+              </Typography>
+
+              {item.date && item.date !== "—" && (
+                <Typography
+                  sx={{
+                    fontFamily: "monospace",
+                    fontSize: 9.5,
+                    color: "#64748B",
+                    mt: 0.3,
+                  }}
+                >
+                  {item.date}
+                </Typography>
+              )}
             </Box>
-            <Box sx={{ position: "relative", pl: 2.2 }}>
-              {index < 5 && <Box sx={{ position: "absolute", left: 7, top: 28, bottom: -12, width: 1, bgcolor: "#E5E7EB" }} />}
-              <Box sx={{ position: "absolute", left: 0, top: 8, width: 14, height: 14, borderRadius: "50%", bgcolor: item.color || "#F5B93D" }} />
-              <Typography sx={{ fontWeight: 700, fontSize: 16, color: "#111827" }}>
-                {item.title || item.event || "Timeline event"}
-              </Typography>
-              <Typography sx={{ color: "#6B7280", mt: 0.4, lineHeight: 1.55 }}>
-                {item.description || item.summary || "Every signal, action, and inference in order."}
-              </Typography>
+
+            {/* TIMELINE CONTENT */}
+            <Box
+              sx={{
+                position: "relative",
+                pl: 1.6,
+                pb: index < timeline.slice(0, 6).length - 1 ? 1.2 : 0,
+                minHeight: 0,
+              }}
+            >
+              {index < visibleTimeline.length - 1 && (
+                <Box
+                  sx={{
+                    position: "absolute",
+                    left: "5px",
+                    top: "22px",
+                    bottom: "-14px",
+                    width: "1px",
+                    bgcolor: "#E5E7EB",
+                  }}
+                />
+              )}
+
+              <Box
+                sx={{
+                  position: "absolute",
+                  left: 0,
+                  top: 6,
+                  width: 9,
+                  height: 9,
+                  borderRadius: "50%",
+                  bgcolor: item.color || "#94A3B8",
+                }}
+              />
+
+              <Box
+                sx={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 0.7,
+                  flexWrap: "wrap",
+                }}
+              >
+                <Chip
+                  label={item.source || "SYSTEM"}
+                  size="small"
+                  sx={{
+                    height: 18,
+                    bgcolor: "#F3F4F6",
+                    color: "#4B5563",
+                    fontSize: 9.5,
+                    fontWeight: 700,
+                    "& .MuiChip-label": {
+                      px: 0.8,
+                    },
+                  }}
+                />
+
+                <Typography
+                  sx={{
+                    fontWeight: 800,
+                    fontSize: { xs: 12.5, md: 13.5 },
+                    color: "#111827",
+                    lineHeight: 1.15,
+                  }}
+                >
+                  {item.title || "Timeline event"}
+                </Typography>
+
+                {item.category && (
+                  <Typography
+                    sx={{
+                      color: "#64748B",
+                      fontSize: 10.5,
+                    }}
+                  >
+                    · {item.category}
+                  </Typography>
+                )}
+              </Box>
+
+              {item.description && (
+                <Typography
+                  sx={{
+                    color: "#334155",
+                    mt: 0.35,
+                    lineHeight: 1.3,
+                    fontSize: 11,
+                  }}
+                >
+                  {item.description}
+                </Typography>
+              )}
+
+              {item.note && (
+                <Typography
+                  sx={{
+                    color: "#64748B",
+                    mt: 0.15,
+                    lineHeight: 1.25,
+                    fontSize: 10.5,
+                    fontStyle: "italic",
+                  }}
+                >
+                  {item.note}
+                </Typography>
+              )}
+
+              {Array.isArray(item.details) && item.details.length > 0 && (
+                <Box
+                  sx={{
+                    mt: 0.35,
+                    display: "grid",
+                    gap: 0.15,
+                  }}
+                >
+                  {item.details.slice(0, 2).map(
+                    (detail: string, detailIndex: number) => (
+                      <Typography
+                        key={detailIndex}
+                        sx={{
+                          color: "#475569",
+                          fontSize: 10,
+                          lineHeight: 1.2,
+                        }}
+                      >
+                        {detail}
+                      </Typography>
+                    )
+                  )}
+                </Box>
+              )}
             </Box>
           </Box>
         ))}
@@ -587,29 +1199,136 @@ function TimelineSection({ data }: { data: AnyObj }) {
   );
 }
 
+
 function RecoveryActionsSection({ data }: { data: AnyObj }) {
   const steps = data.recoveryActions || [];
+  console.log("RECOVERY DATA:", data);
+  console.log("RECOVERY applicationName:", data.applicationName);
+  console.log("RECOVERY environment:", data.environment);
+  console.log("RECOVERY actions:", data.recoveryActions);
+  const [expandedIndex, setExpandedIndex] = useState<number | null>(0);
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+
+  async function copyCommand(command: string, index: number) {
+    try {
+      await navigator.clipboard.writeText(command);
+      setCopiedIndex(index);
+      window.setTimeout(() => {
+        setCopiedIndex((current) => (current === index ? null : current));
+      }, 1400);
+    } catch (error) {
+      console.error("Failed to copy recovery command", error);
+    }
+  }
+
   return (
-    <Paper sx={{ mt: 2, p: 0.5, borderRadius: 4 }}>
-      <Box sx={{ p: 0.5, display: "grid", gap: 1.2 }}>
+    <Paper sx={{ mt: 1.5, p: 0.35, borderRadius: 3 }}>
+      <Box sx={{ p: 0.35, display: "grid", gap: 0.8 }}>
         {steps.slice(0, 5).map((item: AnyObj, index: number) => (
-          <Paper key={index} sx={{ borderRadius: 3, overflow: "hidden" }}>
-            <Box sx={{ p: 2, display: "grid", gridTemplateColumns: "46px 1fr 24px", gap: 1.5, alignItems: "center" }}>
+          <Paper
+            key={index}
+            sx={{
+              borderRadius: 2.5,
+              overflow: "hidden",
+              boxShadow: "0 2px 8px rgba(15, 23, 42, 0.08)",
+            }}
+          >
+            <Box
+              onClick={() => setExpandedIndex(expandedIndex === index ? null : index)}
+              sx={{
+                p: 1.25,
+                display: "grid",
+                gridTemplateColumns: { xs: "38px 1fr 18px", md: "40px 1fr 18px" },
+                gap: 1,
+                alignItems: "center",
+                cursor: "pointer",
+              }}
+            >
               <StepBubble>{index + 1}</StepBubble>
               <Box>
                 <Box sx={{ display: "flex", gap: 1, alignItems: "center", flexWrap: "wrap" }}>
-                  <Chip label={item.priority || "Critical"} color={index === 0 ? "error" : "default"} size="small" />
-                  <Typography sx={{ fontSize: 16, fontWeight: 700, color: "#111827" }}>{item.title || item.action || "Recovery step"}</Typography>
+                  <Chip
+                    label={item.priority || "Critical"}
+                    color={index === 0 ? "error" : item.priority === "Medium" ? "info" : "default"}
+                    size="small"
+                    sx={{
+                      height: 22,
+                      fontSize: 10,
+                      fontWeight: 800,
+                      borderRadius: 999,
+                    }}
+                  />
+                  <Typography sx={{ fontSize: { xs: 12.5, md: 13.25 }, fontWeight: 700, color: "#111827", lineHeight: 1.15 }}>
+                    {item.title || item.action || "Recovery step"}
+                  </Typography>
                 </Box>
-                <Typography sx={{ color: "#6B7280", mt: 0.3 }}>{item.subtitle || item.owner || "Platform-SRE on-call"}</Typography>
+                <Typography sx={{ color: "#6B7280", mt: 0.2, fontSize: 11 }}>
+                  {item.subtitle || item.owner || "Platform-SRE on-call"}
+                </Typography>
               </Box>
-              <Typography sx={{ color: "#94A3B8", textAlign: "right" }}>⌄</Typography>
-            </Box>
-            <Box sx={{ bgcolor: "#050816", color: "#fff", p: 2.2, fontFamily: "monospace" }}>
-              <Typography sx={{ fontSize: 14, whiteSpace: "pre-wrap" }}>
-                {item.command || item.details || "No command available."}
+              <Typography sx={{ color: "#94A3B8", textAlign: "right", fontSize: 18, lineHeight: 1 }}>
+                {expandedIndex === index ? "⌃" : "⌄"}
               </Typography>
             </Box>
+            {expandedIndex === index ? (
+              <Box sx={{ bgcolor: "#050816", color: "#E2E8F0", px: 1.4, py: 1.35 }}>
+                <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1.5, mb: 1.6 }}>
+                  <Typography sx={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.08em", color: "#7DD3FC" }}>
+                    COMMAND
+                  </Typography>
+                  <Box sx={{ display: "flex", alignItems: "center" }}>
+                    <Button
+                      size="small"
+                      variant="text"
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        copyCommand(buildRecoveryCommand(item, data), index);
+                      }}
+                      startIcon={<ContentCopyOutlinedIcon sx={{ fontSize: 14 }} />}
+                      sx={{
+                        textTransform: "none",
+                        color: "#E2E8F0",
+                        fontWeight: 500,
+                        minWidth: "auto",
+                        px: 1.25,
+                        "&:hover": {
+                          bgcolor: "rgba(148, 163, 184, 0.08)",
+                        },
+                      }}
+                    >
+                      {copiedIndex === index ? "Copied" : "Copy"}
+                    </Button>
+                  </Box>
+                </Box>
+                <Box
+                  sx={{
+                    fontFamily: '"SFMono-Regular", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+                    fontSize: 12.5,
+                    lineHeight: 1.6,
+                    whiteSpace: "pre-wrap",
+                    borderRadius: 2,
+                    bgcolor: "#020617",
+                    border: "1px solid #1E293B",
+                    px: 1.25,
+                    py: 1.15,
+                  }}
+                >
+                  <Typography
+                    component="pre"
+                    sx={{
+                      m: 0,
+                      color: "#E2E8F0",
+                      fontSize: "inherit",
+                      lineHeight: "inherit",
+                      whiteSpace: "pre-wrap",
+                      fontFamily: "inherit",
+                    }}
+                  >
+                    {buildRecoveryCommand(item, data)}
+                  </Typography>
+                </Box>
+              </Box>
+            ) : null}
           </Paper>
         ))}
       </Box>
@@ -617,64 +1336,471 @@ function RecoveryActionsSection({ data }: { data: AnyObj }) {
   );
 }
 
-function RecommendationsSection({ data }: { data: AnyObj }) {
-  const groups = data.recommendationGroups || [];
-  return (
-    <Box sx={{ mt: 2, display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(3, 1fr)" }, gap: 2 }}>
-      {groups.slice(0, 6).map((group: AnyObj, index: number) => (
-        <RecommendationCard key={index} title={group.title || "Recommendation"} accent={group.accent || "#F97316"} items={group.items || []} />
-      ))}
-    </Box>
+function buildRecoveryCommand(item: AnyObj, data: AnyObj) {
+  if (item?.command && String(item.command).trim()) {
+    return String(item.command).trim();
+  }
+
+  const title = compactText(
+    item?.title || item?.action || item?.subtitle || "recovery step"
+  ).toLowerCase();
+
+  return inferCommandFromTask(title, item, data);
+}
+
+function inferCommandFromTask(
+  title: string,
+  item: AnyObj,
+  data: AnyObj
+) {
+  const scope = inferCommandScope(item);
+  const name = inferCommandName(item, data);
+  const namespace = inferCommandNamespace(item, data);
+
+  const deploymentName = inferDeploymentName(data);
+  const serviceName = inferServiceName(data);
+  const podSelector = buildPodSelector(data);
+
+  const lower = title.toLowerCase();
+
+  // --------------------------------------------------
+  // External / upstream dependency investigation
+  // --------------------------------------------------
+  if (
+    lower.includes("upstream") ||
+    lower.includes("external dependenc") ||
+    lower.includes("data source") ||
+    lower.includes("message queue") ||
+    lower.includes("database") ||
+    lower.includes("file share")
+  ) {
+    return [
+      `$ kubectl get pods -n ${namespace} -l '${podSelector}'`,
+      `$ kubectl logs -n ${namespace} -l '${podSelector}' --tail=200 | grep -Ei 'connection|timeout|database|queue|upstream|error|exception'`,
+    ].join("\n");
+  }
+
+  // --------------------------------------------------
+  // Scheduler / trigger / batch processing
+  // --------------------------------------------------
+  if (
+    lower.includes("scheduler") ||
+    lower.includes("trigger") ||
+    lower.includes("batch job") ||
+    lower.includes("cron")
+  ) {
+    return [
+      `$ kubectl get cronjobs,jobs -n ${namespace}`,
+      `$ kubectl get pods -n ${namespace} -l '${podSelector}'`,
+      `$ kubectl logs -n ${namespace} -l '${podSelector}' --tail=200`,
+    ].join("\n");
+  }
+
+  // --------------------------------------------------
+  // HTTPRoute
+  // --------------------------------------------------
+  if (lower.includes("httproute") || lower.includes("route")) {
+    if (lower.includes("verify") || lower.includes("check")) {
+      return `$ kubectl get httproute ${name} -n ${namespace} -o yaml`;
+    }
+
+    return `$ kubectl describe httproute ${name} -n ${namespace}`;
+  }
+
+  // --------------------------------------------------
+  // Service selector
+  // --------------------------------------------------
+  if (
+    lower.includes("service selector") ||
+    (lower.includes("service") &&
+      (lower.includes("patch") || lower.includes("update")))
+  ) {
+    return [
+      `$ kubectl get service ${serviceName} -n ${namespace} -o yaml`,
+      podSelector
+        ? `$ kubectl get pods -n ${namespace} -l '${podSelector}' --show-labels`
+        : `$ kubectl get pods -n ${namespace} --show-labels`,
+    ].join("\n");
+  }
+
+  // --------------------------------------------------
+  // Endpoint / upstream health
+  // --------------------------------------------------
+  if (lower.includes("endpoint")) {
+    return [
+      `$ kubectl get endpoints ${serviceName} -n ${namespace}`,
+      `$ kubectl describe service ${serviceName} -n ${namespace}`,
+    ].join("\n");
+  }
+
+  // --------------------------------------------------
+  // Restart deployment
+  // --------------------------------------------------
+  if (lower.includes("restart") || lower.includes("deployment")) {
+    return [
+      `$ kubectl rollout restart deployment/${deploymentName} -n ${namespace}`,
+      `$ kubectl rollout status deployment/${deploymentName} -n ${namespace}`,
+    ].join("\n");
+  }
+
+  // --------------------------------------------------
+  // Application configuration
+  // --------------------------------------------------
+  if (
+    lower.includes("configuration") ||
+    lower.includes("config") ||
+    lower.includes("environment variable") ||
+    lower.includes("startup parameter")
+  ) {
+    return [
+      `$ kubectl get deployment ${name} -n ${namespace} -o yaml`,
+      `$ kubectl get configmap -n ${namespace}`,
+      `$ kubectl describe deployment ${name} -n ${namespace}`,
+    ].join("\n");
+  }
+
+  // --------------------------------------------------
+  // Pods
+  // --------------------------------------------------
+  if (lower.includes("pod")) {
+    return [
+      `$ kubectl get pods -n ${namespace} -l '${podSelector}' -o wide`,
+      `$ kubectl logs -n ${namespace} -l '${podSelector}' --tail=100`,
+    ].join("\n");
+  }
+
+  // --------------------------------------------------
+  // Logs
+  // --------------------------------------------------
+  if (lower.includes("log") || lower.includes("error")) {
+    return `$ kubectl logs -n ${namespace} -l '${podSelector}' --tail=100 | grep -Ei 'error|warn'`;
+  }
+
+  // --------------------------------------------------
+  // Gateway / ingress
+  // --------------------------------------------------
+  if (lower.includes("gateway") || lower.includes("ingress")) {
+    return [
+      `$ kubectl get gateway -n ${namespace}`,
+      `$ kubectl get httproute -n ${namespace}`,
+    ].join("\n");
+  }
+
+  // --------------------------------------------------
+  // Scale
+  // --------------------------------------------------
+  if (lower.includes("scale")) {
+    return `$ kubectl scale deployment/${name} -n ${namespace} --replicas=<desired-replicas>`;
+  }
+
+  // --------------------------------------------------
+  // Generic validation
+  // --------------------------------------------------
+  if (
+    lower.includes("check") ||
+    lower.includes("validate") ||
+    lower.includes("verify")
+  ) {
+    return `$ kubectl get ${scope} ${name} -n ${namespace} -o wide`;
+  }
+
+  // --------------------------------------------------
+  // Final fallback
+  // --------------------------------------------------
+  return `$ kubectl get ${scope} ${name} -n ${namespace} -o wide`;
+}
+
+function inferCommandScope(item: AnyObj) {
+  const text = compactText([item?.title, item?.action, item?.subtitle, item?.details, item?.owner].filter(Boolean).join(" ")).toLowerCase();
+  if (text.includes("httproute") || text.includes("route")) return "httproute";
+  if (text.includes("deployment") || text.includes("restart")) return "deployment";
+  if (text.includes("service")) return "service";
+  if (text.includes("pod")) return "pod";
+  if (text.includes("gateway")) return "gateway";
+  if (text.includes("ingress")) return "ingress";
+  if (text.includes("configmap")) return "configmap";
+  if (text.includes("secret")) return "secret";
+  if (text.includes("endpoints")) return "endpoints";
+  return "resource";
+}
+
+function inferCommandName(item: AnyObj, data: AnyObj) {
+  const explicitCandidates = [
+    item?.resource,
+    item?.name,
+    item?.target,
+    item?.service,
+    item?.object,
+  ];
+
+  for (const candidate of explicitCandidates) {
+    const text = compactText(candidate);
+
+    if (text && text !== "-") {
+      return text;
+    }
+  }
+
+  const applicationName = compactText(data?.applicationName);
+
+  if (applicationName && applicationName !== "-") {
+    return applicationName;
+  }
+
+  return "<name>";
+}
+
+function inferCommandNamespace(item: AnyObj, data: AnyObj) {
+  const explicitCandidates = [
+    item?.namespace,
+    item?.kubernetes_namespace,
+    item?.target_namespace,
+  ];
+
+  for (const candidate of explicitCandidates) {
+    const text = compactText(candidate);
+
+    if (text && text !== "-") {
+      return text;
+    }
+  }
+
+  const discoveredNamespace = compactText(
+    data?.kubernetesResources?.namespace ||
+    data?.kubernetes_resources?.namespace
+  );
+
+  if (discoveredNamespace && discoveredNamespace !== "-") {
+    return discoveredNamespace;
+  }
+
+  const namespace = compactText(data?.namespace);
+
+  if (namespace && namespace !== "-") {
+    return namespace;
+  }
+
+  return "<namespace>";
+}
+
+function inferDeploymentName(data: AnyObj) {
+  return compactText(
+    data?.deploymentName ||
+    data?.kubernetesResources?.deployment ||
+    data?.applicationName ||
+    "<deployment>"
   );
 }
 
-function SimilarIncidentsSection({ data }: { data: AnyObj }) {
-  const rows = data.similarIncidents || [];
+function inferServiceName(data: AnyObj) {
+  return compactText(
+    data?.serviceName ||
+    data?.kubernetesResources?.service ||
+    data?.applicationName ||
+    "<service>"
+  );
+}
+
+function buildPodSelector(data: AnyObj) {
+  const selector =
+    data?.podSelector ||
+    data?.kubernetesResources?.pod_selector;
+
+  if (!selector || typeof selector !== "object") {
+    return "";
+  }
+
+  return Object.entries(selector)
+    .map(([key, value]) => `${key}=${value}`)
+    .join(",");
+}
+
+function SimilarIncidentsSection({
+  data,
+  rows,
+}: {
+  data: AnyObj;
+  rows: SimilarIncident[];
+}) {
+  const normalizedRows = rows.slice(0, 3).map((row) => {
+    let rootCause = row.root_cause || "-";
+
+    // Extract title if backend returns a serialized root-cause object
+    if (typeof rootCause === "string") {
+      const titleMatch = rootCause.match(
+        /['"]title['"]\s*:\s*['"]([^'"]+)['"]/
+      );
+
+      if (titleMatch?.[1]) {
+        rootCause = titleMatch[1];
+      }
+    }
+
+    const similarity =
+      typeof row.similarity === "number"
+        ? Math.round(row.similarity * 100)
+        : 0;
+
+    return {
+      incident: row.incident || "-",
+      application:
+        row.application ||
+        data.applicationName ||
+        "-",
+      rootCause,
+      resolution: row.resolution || "-",
+      status: row.status || "Unknown",
+      similarity,
+    };
+  });
+
   return (
-    <Paper sx={{ mt: 2, p: 0.5, borderRadius: 4, overflow: "hidden" }}>
-      <Box sx={{ display: "grid", gridTemplateColumns: "1.1fr 1fr 2fr 0.8fr 1fr 0.9fr", px: 2.5, py: 1.5, color: "#6B7280", fontSize: 12, fontWeight: 800, letterSpacing: "0.08em" }}>
+    <Paper
+      sx={{
+        mt: 2,
+        p: 0.5,
+        borderRadius: 4,
+        overflow: "hidden",
+      }}
+    >
+      <Box
+        sx={{
+          display: "grid",
+          gridTemplateColumns:
+            "1.1fr 1fr 2.2fr 0.9fr 0.9fr 1.2fr",
+          px: 2.5,
+          py: 1.5,
+          color: "#6B7280",
+          fontSize: 12,
+          fontWeight: 800,
+          letterSpacing: "0.08em",
+        }}
+      >
         <div>INCIDENT</div>
         <div>APPLICATION</div>
         <div>ROOT CAUSE</div>
         <div>RESOLUTION</div>
-        <div>RESOLVED BY</div>
+        <div>STATUS</div>
         <div>SIMILARITY</div>
       </Box>
+
       <Divider />
-      {rows.slice(0, 3).map((row: AnyObj, index: number) => (
-        <Box key={index} sx={{ display: "grid", gridTemplateColumns: "1.1fr 1fr 2fr 0.8fr 1fr 0.9fr", px: 2.5, py: 1.8, alignItems: "center", borderBottom: index < 2 ? "1px solid #EEF2F7" : "none" }}>
-          <Typography sx={{ fontFamily: "monospace", fontWeight: 800, color: "#1E3A8A" }}>{row.incident}</Typography>
-          <Typography>{row.application}</Typography>
-          <Typography sx={{ color: "#6B7280" }}>{row.rootCause}</Typography>
-          <Typography>{row.resolution}</Typography>
-          <Typography>{row.resolvedBy}</Typography>
-          <Typography sx={{ fontWeight: 800, textAlign: "right" }}>{row.similarity}%</Typography>
+
+      {normalizedRows.length === 0 ? (
+        <Box
+          sx={{
+            px: 2.5,
+            py: 2,
+            color: "#6B7280",
+          }}
+        >
+          No similar incidents found for this investigation.
         </Box>
-      ))}
+      ) : (
+        normalizedRows.map((row) => (
+          <Box
+            key={row.incident}
+            sx={{
+              display: "grid",
+              gridTemplateColumns:
+                "1.1fr 1fr 2.2fr 0.9fr 0.9fr 1.2fr",
+              px: 2.5,
+              py: 1.8,
+              alignItems: "center",
+              borderBottom: "1px solid #EEF2F7",
+            }}
+          >
+            <Typography
+              sx={{
+                fontFamily: "monospace",
+                fontWeight: 800,
+                color: "#1E3A8A",
+              }}
+            >
+              {row.incident}
+            </Typography>
+
+            <Typography>
+              {row.application}
+            </Typography>
+
+            <Typography sx={{ color: "#6B7280" }}>
+              {row.rootCause}
+            </Typography>
+
+            <Typography>
+              {row.resolution}
+            </Typography>
+
+            <Chip
+              label={row.status}
+              size="small"
+              sx={{
+                width: "fit-content",
+                fontWeight: 700,
+              }}
+            />
+
+            <Box
+              sx={{
+                display: "flex",
+                alignItems: "center",
+                gap: 1.25,
+              }}
+            >
+              <Box
+                sx={{
+                  flex: 1,
+                  height: 6,
+                  bgcolor: "#E5E7EB",
+                  borderRadius: 999,
+                  overflow: "hidden",
+                }}
+              >
+                <Box
+                  sx={{
+                    width: `${row.similarity}%`,
+                    height: "100%",
+                    bgcolor: "#1E3A8A",
+                    borderRadius: 999,
+                  }}
+                />
+              </Box>
+
+              <Typography
+                sx={{
+                  minWidth: 38,
+                  fontWeight: 800,
+                  textAlign: "right",
+                }}
+              >
+                {row.similarity}%
+              </Typography>
+            </Box>
+          </Box>
+        ))
+      )}
     </Paper>
   );
 }
 
-function FooterSection({ data }: { data: AnyObj }) {
-  return (
-    <Paper sx={{ mt: 3, p: 3, borderRadius: 4 }}>
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(4, 1fr)" }, gap: 2 }}>
-        <FooterKV label="REPORT ID" value={data.reportId} />
-        <FooterKV label="GENERATED AT" value={data.generatedAt} />
-        <FooterKV label="INVESTIGATION DURATION" value={data.investigationDuration} />
-        <FooterKV label="AGENT VERSION" value={data.agentVersion} />
-      </Box>
-      <Divider sx={{ my: 2.5 }} />
-      <Typography sx={{ color: "#6B7280", fontSize: 13, lineHeight: 1.6 }}>
-        This report was generated by the AI SRE Incident Agent from live signals across logs, metrics, deployments, Kubernetes state, and knowledge sources.
-      </Typography>
-      <Box sx={{ display: "flex", gap: 1, mt: 2, flexWrap: "wrap" }}>
-        <Button variant="outlined">Helpful</Button>
-        <Button variant="outlined">Not helpful</Button>
-        <Button variant="outlined">Escalate to human</Button>
-      </Box>
-    </Paper>
-  );
+function inferIssueStartedDescription(
+  report: AnyObj | null,
+  applicationName: string
+) {
+  const rootCause = firstText([
+    report?.ai_investigation?.root_cause?.title,
+    report?.ai_investigation?.root_cause?.description,
+    report?.root_cause?.title,
+    report?.root_cause?.description,
+    report?.technical_investigation?.root_cause,
+  ]);
+
+  if (!rootCause) {
+    return `${applicationName} started experiencing service disruption.`;
+  }
+
+  return `${applicationName} started failing due to ${rootCause}.`;
 }
 
 function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: AnyObj | null) {
@@ -687,6 +1813,14 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
     job?.context?.application_name ??
     job?.context?.service_name ??
     "-";
+  const environment =
+    compactText(
+      report?.hero?.environment ||
+      report?.environment ||
+      incident?.environment ||
+      job?.context?.environment ||
+      job?.incident?.environment
+    ) || "-";
   const shortDescription =
     report?.hero?.short_description ??
     incident?.short_description ??
@@ -765,19 +1899,12 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
     job?.incident?.short_description ??
     job?.current_step ??
     "Investigation failed";
-  const recommendationGroups = [
-    {
-      title: "Recommendations",
-      accent: "#F97316",
-      items:
-        report?.recommendations?.recommendations?.map(
-          (r: AnyObj) => r.action ?? r.description ?? r.title
-        ) ?? [],
-    },
-  ];
-
   const tech = report?.technical_investigation ?? {};
   const infra = report?.infrastructure ?? [];
+  const kubernetesResources =
+    report?.kubernetes_resources ??
+    latestAi?.kubernetes_resources ??
+    {};
   console.log(
     "REPORT HERO",
     JSON.stringify(report?.hero, null, 2)
@@ -795,31 +1922,43 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
     heroDuration: isFailed ? investigationTime ?? job?.completed_at ?? "0s" : investigationTime,
     heroApp: report?.hero?.application ?? latestAi?.hero?.application ?? applicationName,
     heroEnv:
-        report?.hero?.environment ??
-        incident?.environment ??
-        job?.context?.environment ??
-        "Unknown",
+      report?.hero?.environment ??
+      incident?.environment ??
+      job?.context?.environment ??
+      "Unknown",
 
     heroLocation:
-        report?.hero?.location ??
-        incident?.location ??
-        job?.context?.location ??
-        "",
+      report?.hero?.location ??
+      incident?.location ??
+      job?.context?.location ??
+      "",
     heroGeneratedAt: report?.hero?.generated_at ?? latestAi?.footer?.generated_at ?? formatDate(job?.started_at),
     heroComponents: isFailed ? report?.hero?.components ?? latestAi?.hero?.components ?? "-" : report?.hero?.components ?? "14 inspected",
     heroEta: formatEta(
       report?.hero?.eta ??
-        latestAi?.hero?.eta ??
-        aiResult?.estimated_recovery_time ??
-        "-"
+      latestAi?.hero?.eta ??
+      aiResult?.estimated_recovery_time ??
+      "-"
     ),
 
     executiveRootCause: isFailed ? rootCause : rootCause,
-    severity: job?.investigation_result?.status ?? job?.status ?? "-",
-    owner: job?.executive?.recommended_owner ?? "Platform-SRE on-call (Priya Menon)",
-    risk: job?.ai_result?.business_impact ?? "Medium - mitigation is a single kubectl patch, reversible in seconds.",
-    businessImpact: report?.executive_summary?.businessImpact ?? latestAi?.ai_investigation?.business_impact ?? job?.impact?.business_impact ?? "-",
-    currentStatus: report?.executive_summary?.currentStatus ?? latestAi?.ai_investigation?.diagnosis ?? job?.current_step ?? "-",
+    severity: deriveSeverity(job, report, latestAi),
+    risk: deriveRisk(job, report, latestAi),
+    businessImpact:
+      report?.executive_summary?.businessImpact ??
+      report?.ai_investigation?.business_impact ??
+      latestAi?.ai_investigation?.business_impact ??
+      job?.impact?.business_impact ??
+      job?.impact?.user_impact ??
+      job?.impact?.availability ??
+      "-",
+    serviceStatus:
+      incident?.state ??
+      incidentPayload?.incident?.state ??
+      job?.incident?.state ??
+      job?.context?.state ??
+      job?.current_status ??
+      "-",
     confidenceReasons: report?.ai_investigation?.reasoning ?? job?.ai_result?.reasoning ?? [],
     failurePoint: failureReason ?? report?.ai_investigation?.failure_point ?? latestAi?.ai_investigation?.failure_point ?? "-",
     primaryEvidence: report?.ai_investigation?.primary_evidence ?? latestAi?.ai_investigation?.primary_evidence ?? [],
@@ -832,36 +1971,59 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
     logsTitle: tech.logs?.title ?? "Logs",
     logsSummary: tech.logs?.summary ?? "-",
     logsCount: tech.logs?.findings?.length ?? 0,
+    logsFindings: extractStrings(tech.logs?.findings),
 
     metricsTitle: tech.metrics?.title ?? "Metrics",
     metricsSummary: tech.metrics?.summary ?? "-",
     metricsCount: tech.metrics?.findings?.length ?? 0,
+    metricsFindings: extractStrings(tech.metrics?.findings),
 
     deploymentsTitle: tech.deployment?.title ?? "Deployment",
     deploymentsSummary: tech.deployment?.summary ?? "-",
     deploymentsCount: tech.deployment?.findings?.length ?? 0,
+    deploymentsFindings: extractStrings(tech.deployment?.findings),
 
     kubernetesTitle: tech.kubernetes?.title ?? "Kubernetes",
     kubernetesSummary: tech.kubernetes?.summary ?? "-",
     kubernetesCount: tech.kubernetes?.findings?.length ?? 0,
+    kubernetesFindings: extractStrings(tech.kubernetes?.findings),
 
     networkTitle: tech.network?.title ?? "Network",
     networkSummary: tech.network?.summary ?? "-",
     networkCount: tech.network?.findings?.length ?? 0,
+    networkFindings: extractStrings(tech.network?.findings),
 
     depsTitle: tech.dependency?.title ?? "Dependencies",
     depsSummary: tech.dependency?.summary ?? "-",
     depsCount: tech.dependency?.findings?.length ?? 0,
+    depsFindings: extractStrings(tech.dependency?.findings),
 
     applicationName,
+    environment,
+    kubernetesResources,
+
+    namespace:
+      kubernetesResources?.namespace ??
+      "-",
+
+    deploymentName:
+      kubernetesResources?.deployment ??
+      "-",
+
+    serviceName:
+      kubernetesResources?.service ??
+      "-",
+
+    podSelector:
+      kubernetesResources?.pod_selector ??
+      {},
 
     infrastructure: infra,
 
     evidenceHeadline: "Evidence collected during investigation",
 
-    evidenceSubhead: `${report?.evidence?.primary?.length ?? 0} primary findings, ${
-      report?.evidence?.supporting?.length ?? 0
-    } supporting findings`,
+    evidenceSubhead: `${report?.evidence?.primary?.length ?? 0} primary findings, ${report?.evidence?.supporting?.length ?? 0
+      } supporting findings`,
 
     evidenceLines: [
       ...(report?.evidence?.primary ?? []),
@@ -869,32 +2031,35 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
       ...(report?.evidence?.contradictions ?? []),
     ],
 
-    timeline: report?.timeline ?? job?.timeline ?? [
-      { time: "08:03:11", title: "Sync applied", description: "market-dev @ v2.14.3 rolled out", color: "#F5B93D" },
-      { time: "08:04:40", title: "First 5xx", description: "upstream connect error on cluster market-dev|8080", color: "#EF4444" },
-      { time: "08:06:00", title: "SLO breach", description: "5xx rate crosses 5% threshold", color: "#EF4444" },
-      { time: "08:12:04", title: "Incident opened", description: "INC0087421 auto-created with severity Critical", color: "#EF4444" },
-      { time: "08:15:20", title: "Investigation started", description: "14 components queued for parallel inspection", color: "#10B981" },
-      { time: "08:17:42", title: "Failure localized", description: "Service selector ≠ Pod labels", color: "#F5B93D" },
-    ],
+    timeline: buildIncidentTimeline({
+      report,
+      job,
+      incidentPayload,
+      applicationName,
+      incidentNumber,
+      failurePoint: failureReason ?? report?.ai_investigation?.failure_point ?? latestAi?.ai_investigation?.failure_point ?? "",
+      rootCause,
+      cause,
+      how,
+      confidence,
+      investigationTime,
+    }),
 
     recoveryActions:
       report?.recovery?.resolution_plan?.map((step: string, index: number) => ({
         priority: index === 0 ? "Critical" : "High",
         title: step,
         subtitle: `Estimated Recovery: ${report?.recovery?.estimated_time ?? "-"}`,
-        command: step,
       })) ?? [
-      { priority: "Critical", title: "Verify HTTPRoute references the correct Service", subtitle: "Platform-SRE on-call · ETA 1 min", command: "kubectl get httproute market-dev.web -o yaml | grep backendRefs -A4" },
-      { priority: "Critical", title: "Patch Service selector to match new pod labels", subtitle: "Platform-SRE on-call · ETA 2 min", command: "kubectl patch service market-dev --type merge -p '{...}'" },
-      { priority: "High", title: "Validate Ingress gateway sees healthy upstreams", subtitle: "Platform-SRE on-call · ETA 1 min", command: "kubectl get endpoints market-dev" },
-      { priority: "High", title: "Restart deployment if endpoints still empty", subtitle: "Platform-SRE on-call · ETA 3 min", command: "kubectl rollout restart deploy market-dev" },
-      { priority: "Medium", title: "Add pre-deploy check to validate Service selector matches template labels", subtitle: "Platform Engineering · ETA 1 day", command: "Add CI gate for selector/template parity" },
-    ],
-
-    recommendationGroups,
+        { priority: "Critical", title: "Verify HTTPRoute references the correct Service", subtitle: "Platform-SRE on-call · ETA 1 min", command: "kubectl get httproute market-dev.web -o yaml | grep backendRefs -A4" },
+        { priority: "Critical", title: "Patch Service selector to match new pod labels", subtitle: "Platform-SRE on-call · ETA 2 min", command: "kubectl patch service market-dev --type merge -p '{...}'" },
+        { priority: "High", title: "Validate Ingress gateway sees healthy upstreams", subtitle: "Platform-SRE on-call · ETA 1 min", command: "kubectl get endpoints market-dev" },
+        { priority: "High", title: "Restart deployment if endpoints still empty", subtitle: "Platform-SRE on-call · ETA 3 min", command: "kubectl rollout restart deploy market-dev" },
+        { priority: "Medium", title: "Add pre-deploy check to validate Service selector matches template labels", subtitle: "Platform Engineering · ETA 1 day", command: "Add CI gate for selector/template parity" },
+      ],
 
     similarIncidents: report?.similar_incidents ?? latestAi?.similar_incidents ?? [],
+    knowledgeMatches: report?.knowledge?.matches ?? latestAi?.knowledge?.matches ?? [],
 
     reportId: report?.footer?.report_id ?? `RPT-${incidentNumber}-1`,
     generatedAt: report?.footer?.generated_at ?? formatDate(job?.started_at),
@@ -906,6 +2071,671 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
       "-",
     agentVersion: report?.footer?.agent_version ?? "AI SRE Agent v4.2.1",
   };
+}
+
+function formatTimelineTimeIST(value: string | null | undefined) {
+  if (!value) {
+    return {
+      date: "—",
+      time: "—",
+    };
+  }
+
+  const parsed = new Date(value);
+
+  if (Number.isNaN(parsed.getTime())) {
+    return {
+      date: "—",
+      time: value,
+    };
+  }
+
+  return {
+    date: parsed.toLocaleDateString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "2-digit",
+      month: "short",
+    }),
+    time: parsed.toLocaleTimeString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }),
+  };
+}
+
+function buildIncidentTimeline({
+  report,
+  job,
+  incidentPayload,
+  applicationName,
+  incidentNumber,
+  failurePoint,
+  rootCause,
+  cause,
+  how,
+  confidence,
+  investigationTime,
+}: {
+  report: AnyObj | null;
+  job: AnyObj | null;
+  incidentPayload: AnyObj | null;
+  applicationName: string;
+  incidentNumber: string;
+  failurePoint: unknown;
+  rootCause: unknown;
+  cause: unknown;
+  how: unknown;
+  confidence: unknown;
+  investigationTime: unknown;
+}) {
+  const incident = incidentPayload?.incident ?? {};
+
+  const issueStartedAt =
+    report?.timeline?.issue_started_at ||
+    report?.issue_started_at ||
+    job?.issue_started_at ||
+    job?.detected_at ||
+    incident?.detected_at ||
+    incident?.opened_at ||
+    "";
+
+  const incidentRaisedAt =
+    incident?.opened_at ||
+    job?.incident?.opened_at ||
+    job?.created_at ||
+    "";
+
+  const investigationStartedAt =
+    job?.started_at ||
+    job?.created_at ||
+    "";
+
+  const investigationCompletedAt =
+    job?.completed_at ||
+    report?.footer?.generated_at ||
+    report?.hero?.generated_at ||
+    "";
+
+  // Exact incident symptom
+  const issue =
+    firstText([
+      incident?.short_description,
+      job?.incident?.short_description,
+      job?.short_description,
+      report?.hero?.short_description,
+    ]) || `Issue detected in ${applicationName}.`;
+
+  // Exact localized failure
+  const localizedFailure =
+    firstText([
+      failurePoint,
+      report?.ai_investigation?.failure_point,
+    ]) || "Failure location identified.";
+
+  // Exact root cause
+  const rootCauseTitle =
+    firstText([
+      report?.ai_investigation?.root_cause?.title,
+      cause,
+    ]);
+
+  const rootCauseDescription =
+    firstText([
+      report?.ai_investigation?.root_cause?.description,
+      rootCause,
+      how,
+    ]);
+
+  // Recovery plan
+  const recoveryPlan = extractStrings(
+    report?.recovery?.resolution_plan,
+    report?.ai_investigation?.resolution_plan,
+    incidentPayload?.latest_ai?.ai_investigation?.resolution_plan,
+    job?.recommendations?.actions,
+    job?.recommendations?.items,
+  );
+
+  const confidenceText =
+    typeof confidence === "number"
+      ? `${Math.round(confidence)}% confidence`
+      : "";
+
+  return [
+    {
+      ...formatTimelineTimeIST(issueStartedAt),
+      source: "APPLICATION",
+      category: "Issue",
+      title: "Issue started",
+      description: inferIssueStartedDescription(
+        report,
+        applicationName
+      ),
+      note: "",
+      details: [],
+      color: "#EF4444",
+    },
+
+    {
+      ...formatTimelineTimeIST(incidentRaisedAt),
+      source: "SERVICENOW",
+      category: "Incident",
+      title: "Incident raised",
+      description:
+        incidentNumber && incidentNumber !== "-"
+          ? `${incidentNumber} raised for ${applicationName}.`
+          : `Incident raised for ${applicationName}.`,
+      note: "",
+      details: [],
+      color: "#EF4444",
+    },
+
+    {
+      ...formatTimelineTimeIST(investigationStartedAt),
+      source: "AI SRE AGENT",
+      category: "Investigation",
+      title: "Investigation started",
+      description: `Investigation started for ${applicationName}.`,
+      note: "",
+      details: [],
+      color: "#16A34A",
+    },
+
+    {
+      ...formatTimelineTimeIST(investigationCompletedAt),
+      source: "AI SRE AGENT",
+      category: "Localization",
+      title: "Failure localized",
+      description: localizedFailure,
+      note: "",
+      details: [],
+      color: "#EAB308",
+    },
+
+    {
+      ...formatTimelineTimeIST(investigationCompletedAt),
+      source: "AI SRE AGENT",
+      category: "Root Cause",
+      title: "Root cause identified",
+      description:
+        rootCauseTitle ||
+        rootCauseDescription ||
+        "Root cause identified.",
+      note:
+        rootCauseTitle &&
+        rootCauseDescription &&
+        rootCauseTitle !== rootCauseDescription
+          ? rootCauseDescription
+          : confidenceText,
+      details: [],
+      color: "#16A34A",
+    },
+
+    {
+      ...formatTimelineTimeIST(investigationCompletedAt),
+      source: "AI SRE AGENT",
+      category: "Recovery",
+      title: "Recovery plan generated",
+      description:
+        recoveryPlan[0] ||
+        "Recovery actions generated from the identified root cause.",
+      note:
+        recoveryPlan.length > 1
+          ? `+${recoveryPlan.length - 1} additional recovery action${
+              recoveryPlan.length > 2 ? "s" : ""
+            }`
+          : "",
+      details: [],
+      color: "#1E3A8A",
+    },
+  ];
+}
+
+function inferChangeDescription(report: AnyObj | null, job: AnyObj | null, applicationName: string) {
+  const summary = firstText([
+    report?.technical_investigation?.deployment?.summary,
+    job?.deployment?.assessment?.summary,
+  ]);
+  const findings = firstText([
+    report?.technical_investigation?.deployment?.findings,
+    job?.deployment?.assessment?.findings,
+  ]);
+  const changeRef = firstText([
+    job?.deployment?.revision,
+    job?.deployment?.image_tag,
+    report?.hero?.application,
+    job?.context?.application_name,
+    job?.context?.service_name,
+  ]);
+
+  return [
+    summary || "Deployment change was detected.",
+    findings,
+    changeRef ? `Affected service: ${changeRef}` : "",
+  ].filter(Boolean).join(" ");
+}
+
+function inferSymptomDescription(report: AnyObj | null, job: AnyObj | null, failurePoint: unknown) {
+  const summary = firstText([
+    report?.technical_investigation?.network?.summary,
+    report?.technical_investigation?.logs?.summary,
+    report?.technical_investigation?.metrics?.summary,
+    job?.error,
+    job?.current_step,
+  ]);
+  const ref = firstText([failurePoint]);
+
+  return [
+    ref || "Ingress symptoms detected.",
+    summary,
+  ].filter(Boolean).join(" ");
+}
+
+function inferLocalizationDescription(rootCause: unknown, failurePoint: unknown, how: unknown) {
+  return firstText([failurePoint, how, rootCause]) || "Failure localized from correlated signals.";
+}
+
+function inferRootCauseDescription(cause: unknown, rootCause: unknown, confidence: unknown) {
+  const text = firstText([cause, rootCause]) || "Root cause unavailable.";
+  const conf = typeof confidence === "number" ? ` (${confidence}% confidence)` : "";
+  return `${text}${conf}`;
+}
+
+function inferChangeNote(report: AnyObj | null, job: AnyObj | null) {
+  return [
+    firstText([report?.technical_investigation?.deployment?.summary, job?.deployment?.assessment?.summary]),
+    firstText([report?.technical_investigation?.deployment?.findings, job?.deployment?.assessment?.findings]),
+  ].filter(Boolean).join(" · ") || "No deployment detail was captured.";
+}
+
+function inferSymptomNote(report: AnyObj | null, job: AnyObj | null) {
+  return [
+    firstText([report?.technical_investigation?.network?.findings, job?.network?.assessment?.findings]),
+    firstText([report?.technical_investigation?.logs?.findings, job?.logs?.assessment?.findings]),
+    firstText([report?.technical_investigation?.metrics?.findings, job?.metrics?.assessment?.findings]),
+  ].filter(Boolean).join(" · ") || "No symptom detail was captured.";
+}
+
+function inferIncidentNote(incidentPayload: AnyObj | null, job: AnyObj | null) {
+  return [
+    firstText([incidentPayload?.incident?.state, job?.incident?.state, job?.current_status]),
+    firstText([job?.context?.priority]),
+  ].filter(Boolean).join(" · ") || "Incident state was not available.";
+}
+
+function inferInvestigationDescription(report: AnyObj | null, job: AnyObj | null) {
+  return [
+    firstText([
+      report?.technical_investigation?.logs?.summary,
+      report?.technical_investigation?.metrics?.summary,
+      report?.technical_investigation?.deployment?.summary,
+      report?.technical_investigation?.kubernetes?.summary,
+    ]),
+    firstText([report?.hero?.components, job?.recommendations?.estimated_time, report?.hero?.eta, job?.ai_result?.estimated_recovery_time]),
+  ].filter(Boolean).join(" · ") || "AI investigation started.";
+}
+
+function inferInvestigationNote(report: AnyObj | null, job: AnyObj | null, investigationTime: unknown) {
+  return [
+    firstText([
+      report?.technical_investigation?.logs?.findings,
+      report?.technical_investigation?.metrics?.findings,
+      report?.technical_investigation?.deployment?.findings,
+      report?.technical_investigation?.kubernetes?.findings,
+      report?.technical_investigation?.network?.findings,
+      job?.ai_result?.reasoning,
+    ]),
+    formatDurationText(investigationTime),
+  ].filter(Boolean).join(" · ") || "Parallel evidence collection ran across the available signals.";
+}
+
+function inferLocalizationNote(report: AnyObj | null, job: AnyObj | null) {
+  return [
+    firstText([report?.ai_investigation?.failure_point, job?.correlation?.probable_root_cause]),
+    firstText([report?.ai_investigation?.primary_evidence, job?.correlation?.findings]),
+  ].filter(Boolean).join(" · ") || "Localization evidence was not explicit.";
+}
+
+function inferRootCauseNote(report: AnyObj | null, job: AnyObj | null) {
+  return [
+    firstText([report?.recovery?.resolution_plan, report?.ai_investigation?.resolution_plan, job?.recommendations?.actions]),
+    firstText([report?.executive_summary?.businessImpact, report?.ai_investigation?.business_impact]),
+  ].filter(Boolean).join(" · ") || "Recovery plan was generated from the available evidence.";
+}
+
+function inferChangeDetails(report: AnyObj | null, job: AnyObj | null, applicationName: string) {
+  return compactDetails([
+    firstText([report?.technical_investigation?.deployment?.summary, job?.deployment?.assessment?.summary]),
+    firstText([report?.technical_investigation?.deployment?.findings, job?.deployment?.assessment?.findings]),
+    firstText([job?.deployment?.revision, job?.deployment?.image_tag]),
+    applicationName ? `Service: ${applicationName}` : "",
+  ]);
+}
+
+function inferSymptomDetails(report: AnyObj | null, job: AnyObj | null, failurePoint: unknown) {
+  return compactDetails([
+    firstText([failurePoint]),
+    firstText([report?.technical_investigation?.network?.summary, job?.network?.assessment?.summary]),
+    firstText([report?.technical_investigation?.logs?.summary, job?.logs?.assessment?.summary]),
+    firstText([report?.technical_investigation?.metrics?.summary, job?.metrics?.assessment?.summary]),
+  ]);
+}
+
+function inferIncidentDetails(incidentPayload: AnyObj | null, job: AnyObj | null) {
+  return compactDetails([
+    firstText([incidentPayload?.incident?.short_description, job?.short_description]),
+    firstText([incidentPayload?.incident?.priority, job?.context?.priority]),
+    firstText([incidentPayload?.incident?.state, job?.incident?.state, job?.current_status]),
+  ]);
+}
+
+function inferInvestigationDetails(report: AnyObj | null, job: AnyObj | null, investigationTime: unknown) {
+  return compactDetails([
+    firstText([report?.technical_investigation?.logs?.summary]),
+    firstText([report?.technical_investigation?.metrics?.summary]),
+    firstText([report?.technical_investigation?.deployment?.summary]),
+    firstText([report?.technical_investigation?.kubernetes?.summary]),
+    firstText([formatDurationText(investigationTime)]),
+  ]);
+}
+
+function inferLocalizationDetails(report: AnyObj | null, job: AnyObj | null) {
+  return compactDetails([
+    firstText([report?.ai_investigation?.failure_point]),
+    firstText([report?.ai_investigation?.primary_evidence]),
+    firstText([job?.correlation?.findings]),
+  ]);
+}
+
+function inferRootCauseDetails(report: AnyObj | null, job: AnyObj | null, confidence: unknown) {
+  return compactDetails([
+    firstText([report?.ai_investigation?.root_cause?.title, report?.ai_investigation?.root_cause?.description]),
+    firstText([report?.recovery?.resolution_plan, report?.ai_investigation?.resolution_plan, job?.recommendations?.actions]),
+    typeof confidence === "number" ? `${confidence}% confidence` : "",
+  ]);
+}
+
+function compactDetails(items: unknown[]) {
+  const lines = items
+    .map((item) => String(item || "").replace(/\s+/g, " ").trim())
+    .filter(Boolean);
+
+  return lines.length ? Array.from(new Set(lines)).slice(0, 3) : ["No detail available."];
+}
+
+function firstSentence(values: unknown[]) {
+  const text = firstText(values);
+  if (!text) return "";
+  return text.split(/[.!?]/)[0]?.trim() || text;
+}
+
+function firstText(values: unknown[]) {
+  for (const value of values) {
+    const text = Array.isArray(value) ? firstText(value) : String(value || "").replace(/\s+/g, " ").trim();
+    if (text && text !== "-" && text !== "No dynamic data available.") {
+      return text;
+    }
+  }
+  return "";
+}
+
+function formatTimelineTime(value: unknown) {
+  const text = String(value || "").trim();
+  if (!text) return "";
+  const date = new Date(text);
+  if (Number.isNaN(date.getTime())) return text;
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZoneName: "short",
+  }).format(date);
+}
+
+function formatOffsetTime(base: string, seconds: number) {
+  if (!base || base === "—") return "";
+  const date = new Date(base);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZoneName: "short",
+  }).format(new Date(date.getTime() + seconds * 1000));
+}
+
+function timelineColorFor(text: string) {
+  const lower = String(text || "").toLowerCase();
+  if (lower.includes("incident")) return "#EF4444";
+  if (lower.includes("investigation") || lower.includes("root")) return "#16A34A";
+  if (lower.includes("change") || lower.includes("sync")) return "#EAB308";
+  return "#94A3B8";
+}
+
+function formatDurationText(value: unknown) {
+  const text = String(value || "").trim();
+  return text || "";
+}
+
+function normalizeConfidence(value: unknown) {
+  if (value == null || value === "") return null;
+  const num = typeof value === "string" ? Number.parseFloat(value) : Number(value);
+  if (Number.isNaN(num)) return null;
+  return Math.max(0, Math.min(100, Math.round(num)));
+}
+
+function normalizeReasoningSteps(value: unknown) {
+  const raw = Array.isArray(value) ? value : value ? [value] : [];
+  return raw
+    .map((item: AnyObj | string, index: number) => {
+      if (typeof item === "string") {
+        const text = compactReasoningText(item.trim());
+        return {
+          title: text || `Reasoning step ${index + 1}`,
+          detail: "",
+        };
+      }
+
+      const title = compactReasoningText(item.title || item.label || item.summary || `Reasoning step ${index + 1}`);
+      const detail = compactReasoningText(item.detail || item.description || item.reason || item.explanation || "");
+      return { title, detail };
+    })
+    .filter((item) => item.title && String(item.title).trim())
+    .slice(0, 6);
+}
+
+function compactReasoningText(text: string) {
+  return String(text)
+    .replace(/\s+/g, " ")
+    .replace(/\s+([,.;:])/g, "$1")
+    .trim();
+}
+
+function formatFailurePoint(data: AnyObj) {
+  const applicationName = data.applicationName && data.applicationName !== "-" ? data.applicationName : "service";
+  const candidates = [
+    data.failurePoint,
+    data.failureTitle,
+    data.networkSummary,
+    data.deploymentsSummary,
+    data.kubernetesSummary,
+    data.logsSummary,
+    data.metricsSummary,
+    data.cause,
+    data.executiveRootCause,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate == null) continue;
+    const text = String(candidate).trim();
+    if (!text || text === "-") continue;
+
+    if (/completed/i.test(text)) continue;
+
+    if (/httproute|route|gateway|ingress|selector|service|pod|deployment/i.test(text)) {
+      return formatFailurePointFromText(text, applicationName);
+    }
+  }
+
+  const serviceHints = [
+    data.applicationName,
+    data.heroApp,
+    data.serviceName,
+    data.executiveRootCause,
+  ].filter((value) => value && String(value).trim() && String(value).trim() !== "-");
+
+  if (serviceHints.length) {
+    return `${serviceHints[0]} - failure location not explicitly identified`;
+  }
+
+  return "Failure location not explicitly identified";
+}
+
+function formatFailurePointFromText(text: string, applicationName: string) {
+  const serviceMatch =
+    text.match(/HTTPRoute\s+([^,\n]+)/i) ||
+    text.match(/Service\/([^\s(]+)/i) ||
+    text.match(/service\s+([A-Za-z0-9._-]+)/i) ||
+    text.match(/deployment\s+([A-Za-z0-9._-]+)/i) ||
+    text.match(/pod\s+([A-Za-z0-9._-]+)/i);
+
+  if (serviceMatch?.[1]) {
+    return `kube-system → ${serviceMatch[1].trim()} (${text})`;
+  }
+
+  if (applicationName && applicationName !== "service") {
+    return `kube-system → ${applicationName} (${text})`;
+  }
+
+  return text;
+}
+
+function normalizePrimaryEvidence(value: unknown, data: AnyObj) {
+  const items = Array.isArray(value) ? value : [];
+  const normalized = items
+    .map((item: AnyObj | string) => {
+      if (typeof item === "string") {
+        return item.trim();
+      }
+      return item.title || item.label || item.summary || item.description || item.reason || "";
+    })
+    .filter((item) => item && String(item).trim());
+
+  if (normalized.length) {
+    return normalized.slice(0, 5);
+  }
+
+  return [
+    data.networkSummary && `Network: ${data.networkSummary}`,
+    data.deploymentsSummary && `Deployment: ${data.deploymentsSummary}`,
+    data.logsSummary && `Logs: ${data.logsSummary}`,
+    data.metricsSummary && `Metrics: ${data.metricsSummary}`,
+    data.kubernetesSummary && `Kubernetes: ${data.kubernetesSummary}`,
+  ].filter(Boolean) as string[];
+}
+
+function normalizeAlternativeExclusions(value: unknown, data: AnyObj) {
+  const items = Array.isArray(value) ? value : [];
+  const normalized = items
+    .map((item: AnyObj | string) => {
+      if (typeof item === "string") {
+        return { title: item.trim(), reason: "" };
+      }
+      return {
+        title: item.title || item.name || item.label || "",
+        reason: item.reason || item.detail || item.summary || item.description || "",
+      };
+    })
+    .filter((item) => item.title || item.reason);
+
+  if (normalized.length) {
+    return normalized.slice(0, 4);
+  }
+
+  const fallback = [
+    data.deploymentsSummary && {
+      title: "Deployment failure",
+      reason: data.deploymentsSummary,
+    },
+    data.metricsSummary && {
+      title: "Metrics saturation",
+      reason: data.metricsSummary,
+    },
+    data.logsSummary && {
+      title: "Application logs",
+      reason: data.logsSummary,
+    },
+    data.networkSummary && {
+      title: "Ingress / routing",
+      reason: data.networkSummary,
+    },
+  ].filter(Boolean) as Array<{ title: string; reason: string }>;
+
+  return fallback.slice(0, 4);
+}
+
+function formatSeverity(value: unknown) {
+  if (value == null || value === "") return "-";
+  const text = String(value).trim();
+  return text ? text.toUpperCase() : "-";
+}
+
+function formatRisk(value: unknown, confidence: number | null, severity: string) {
+  if (value != null && String(value).trim()) {
+    return String(value).trim();
+  }
+
+  if (confidence != null) {
+    if (confidence >= 90 || severity === "Critical") return "High - mitigation should be handled immediately.";
+    if (confidence >= 70 || severity === "High") return "Medium - mitigation is a single controlled change.";
+    return "Low - monitor and verify after remediation.";
+  }
+
+  return "-";
+}
+
+function deriveSeverity(job: AnyObj | null, report: AnyObj | null, latestAi: AnyObj | null) {
+  const candidates = [
+    report?.executive_summary?.severity,
+    report?.ai_investigation?.severity,
+    latestAi?.ai_investigation?.severity,
+    latestAi?.severity,
+    job?.ai_result?.severity,
+    job?.severity,
+    job?.incident?.priority,
+    job?.context?.priority,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate == null || candidate === "") continue;
+    const text = String(candidate).toLowerCase();
+    if (text.includes("critical") || text === "1") return "Critical";
+    if (text.includes("high") || text === "2") return "High";
+    if (text.includes("medium") || text === "3") return "Medium";
+    if (text.includes("low") || text === "4") return "Low";
+    return formatSeverity(candidate);
+  }
+
+  return "-";
+}
+
+function deriveRisk(job: AnyObj | null, report: AnyObj | null, latestAi: AnyObj | null) {
+  const candidates = [
+    report?.executive_summary?.risk,
+    report?.ai_investigation?.business_impact,
+    latestAi?.ai_investigation?.business_impact,
+    job?.ai_result?.business_impact,
+    job?.impact?.business_impact,
+  ];
+
+  for (const candidate of candidates) {
+    if (candidate == null) continue;
+    const text = String(candidate).trim();
+    if (text) return text;
+  }
+
+  return "-";
 }
 
 function FailureHero({ data }: { data: AnyObj }) {
@@ -969,8 +2799,8 @@ function FailureHero({ data }: { data: AnyObj }) {
           sx={{
             display: "grid",
             gridTemplateColumns: {
-                xs: "1fr",
-                md: "repeat(3,1fr)",
+              xs: "1fr",
+              md: "repeat(3,1fr)",
             },
             gap: 1.5,
           }}
@@ -1036,33 +2866,33 @@ function FailureHero({ data }: { data: AnyObj }) {
           </Paper>
         </Box>
         <Paper
-            variant="outlined"
-            sx={{
-                mt: 1.5,
-                p: 1.75,
-                borderRadius: 3,
-            }}
+          variant="outlined"
+          sx={{
+            mt: 1.5,
+            p: 1.75,
+            borderRadius: 3,
+          }}
         >
-            <Typography
-                sx={{
-                    fontWeight: 700,
-                    fontSize: 16,
-                    mb: 0.75,
-                }}
-            >
-                Root Cause
-            </Typography>
+          <Typography
+            sx={{
+              fontWeight: 700,
+              fontSize: 16,
+              mb: 0.75,
+            }}
+          >
+            Root Cause
+          </Typography>
 
-            <Typography
-                sx={{
-                    color: "#64748B",
-                    lineHeight: 1.5,
-                    fontSize: 14,
-                    whiteSpace: "pre-wrap",
-                }}
-            >
-                {data.failurePoint || "Application validation failed."}
-            </Typography>
+          <Typography
+            sx={{
+              color: "#64748B",
+              lineHeight: 1.5,
+              fontSize: 14,
+              whiteSpace: "pre-wrap",
+            }}
+          >
+            {data.failurePoint || "Application validation failed."}
+          </Typography>
         </Paper>
       </Stack>
     </Paper>
@@ -1072,63 +2902,63 @@ function FailureHero({ data }: { data: AnyObj }) {
 
 function FailureFindingsSection({ data }: { data: AnyObj }) {
 
-    const stages = data.stages ?? [
-        {
-            name: "Incident Retrieved",
-            status: "SUCCESS",
-            reason: "Incident payload received successfully."
-        },
-        {
-            name: "Incident Parsed",
-            status: "SUCCESS",
-            reason: "Incident fields extracted."
-        },
-        {
-            name: "Application Identified",
-            status: data.heroApp ? "SUCCESS" : "FAILED",
-            reason: data.heroApp
-                ? data.heroApp
-                : "Application could not be identified."
-        },
-        {
-            name: "Application Validation",
-            status: "FAILED",
-            reason: data.failurePoint || "Validation failed."
-        },
-        {
-            name: "Namespace Discovery",
-            status: "SKIPPED",
-            reason: "Depends on application validation."
-        },
-        {
-            name: "Loki",
-            status: data.lokiLogs?.length ? "SUCCESS" : "SKIPPED",
-            reason: data.lokiLogs?.length
-                ? "Logs collected."
-                : "Logs not collected."
-        },
-        {
-            name: "Prometheus",
-            status: "SKIPPED",
-            reason: "Metrics were not queried."
-        },
-        {
-            name: "Kubernetes",
-            status: "SKIPPED",
-            reason: "Resources not inspected."
-        },
-        {
-            name: "ArgoCD",
-            status: "SKIPPED",
-            reason: "Deployment history unavailable."
-        },
-        {
-            name: "AI Diagnosis",
-            status: "SKIPPED",
-            reason: "Investigation stopped before reasoning."
-        }
-    ];
-    return (
+  const stages = data.stages ?? [
+    {
+      name: "Incident Retrieved",
+      status: "SUCCESS",
+      reason: "Incident payload received successfully."
+    },
+    {
+      name: "Incident Parsed",
+      status: "SUCCESS",
+      reason: "Incident fields extracted."
+    },
+    {
+      name: "Application Identified",
+      status: data.heroApp ? "SUCCESS" : "FAILED",
+      reason: data.heroApp
+        ? data.heroApp
+        : "Application could not be identified."
+    },
+    {
+      name: "Application Validation",
+      status: "FAILED",
+      reason: data.failurePoint || "Validation failed."
+    },
+    {
+      name: "Namespace Discovery",
+      status: "SKIPPED",
+      reason: "Depends on application validation."
+    },
+    {
+      name: "Loki",
+      status: data.lokiLogs?.length ? "SUCCESS" : "SKIPPED",
+      reason: data.lokiLogs?.length
+        ? "Logs collected."
+        : "Logs not collected."
+    },
+    {
+      name: "Prometheus",
+      status: "SKIPPED",
+      reason: "Metrics were not queried."
+    },
+    {
+      name: "Kubernetes",
+      status: "SKIPPED",
+      reason: "Resources not inspected."
+    },
+    {
+      name: "ArgoCD",
+      status: "SKIPPED",
+      reason: "Deployment history unavailable."
+    },
+    {
+      name: "AI Diagnosis",
+      status: "SKIPPED",
+      reason: "Investigation stopped before reasoning."
+    }
+  ];
+  return (
     <Paper
       sx={{
         mt: 2,
@@ -1163,15 +2993,15 @@ function FailureFindingsSection({ data }: { data: AnyObj }) {
             stage.status === "SUCCESS"
               ? "#22C55E"
               : stage.status === "FAILED"
-              ? "#EF4444"
-              : "#94A3B8";
+                ? "#EF4444"
+                : "#94A3B8";
 
           const icon =
             stage.status === "SUCCESS"
               ? "✓"
               : stage.status === "FAILED"
-              ? "✕"
-              : "○";
+                ? "✕"
+                : "○";
 
           return (
 
@@ -1241,8 +3071,8 @@ function FailureFindingsSection({ data }: { data: AnyObj }) {
                     stage.status === "SUCCESS"
                       ? "success"
                       : stage.status === "FAILED"
-                      ? "error"
-                      : "default"
+                        ? "error"
+                        : "default"
                   }
                 />
               </Box>
@@ -1455,8 +3285,8 @@ function FailureLokiLogsSection({ data }: { data: AnyObj }) {
               {typeof line === "string"
                 ? line
                 : line.message ??
-                  line.log ??
-                  JSON.stringify(line)}
+                line.log ??
+                JSON.stringify(line)}
             </Typography>
           ))}
         </Box>
@@ -1470,15 +3300,15 @@ function FailureAgentLogSection({ data }: { data: AnyObj }) {
     data.agentLog && data.agentLog.length
       ? data.agentLog
       : [
-          "Investigation started.",
-          "Parsing ServiceNow incident payload.",
-          "Application context identified.",
-          "Connecting to observability platform.",
-          "Querying Grafana metrics.",
-          "Querying Loki logs.",
-          "Collecting Kubernetes resources.",
-          "Investigation terminated unexpectedly.",
-        ];
+        "Investigation started.",
+        "Parsing ServiceNow incident payload.",
+        "Application context identified.",
+        "Connecting to observability platform.",
+        "Querying Grafana metrics.",
+        "Querying Loki logs.",
+        "Collecting Kubernetes resources.",
+        "Investigation terminated unexpectedly.",
+      ];
 
   return (
     <Paper
@@ -1573,22 +3403,22 @@ function FailureAgentLogSection({ data }: { data: AnyObj }) {
         {logs.map((line: string, index: number) => {
           const level =
             line.toLowerCase().includes("error") ||
-            line.toLowerCase().includes("terminated")
+              line.toLowerCase().includes("terminated")
               ? "ERROR"
               : line.toLowerCase().includes("warning")
-              ? "WARNING"
-              : line.toLowerCase().includes("success")
-              ? "SUCCESS"
-              : "INFO";
+                ? "WARNING"
+                : line.toLowerCase().includes("success")
+                  ? "SUCCESS"
+                  : "INFO";
 
           const levelColor =
             level === "ERROR"
               ? "#EF4444"
               : level === "WARNING"
-              ? "#F59E0B"
-              : level === "SUCCESS"
-              ? "#10B981"
-              : "#3B82F6";
+                ? "#F59E0B"
+                : level === "SUCCESS"
+                  ? "#10B981"
+                  : "#3B82F6";
 
           return (
             <Box
@@ -1638,7 +3468,7 @@ function FailureAgentLogSection({ data }: { data: AnyObj }) {
               >
                 {line}
               </Typography>
-                          </Box>
+            </Box>
           );
         })}
 
@@ -1668,7 +3498,7 @@ function FailureAgentLogSection({ data }: { data: AnyObj }) {
               display: "grid",
               gridTemplateColumns: {
                 xs: "1fr",
-              md: "repeat(4,1fr)",
+                md: "repeat(4,1fr)",
               },
               gap: 1.5,
             }}
@@ -1805,7 +3635,7 @@ function FailureAgentLogSection({ data }: { data: AnyObj }) {
           </Typography>
         </Paper>
       </Box>
-          </Paper>
+    </Paper>
   );
 }
 
@@ -1882,27 +3712,120 @@ function TopologyTile({
   metric,
   score,
   status,
+  tone,
 }: {
   name: string;
   type: string;
   metric: string;
   score: string;
   status: string;
+  tone?: "healthy" | "warning" | "problem";
 }) {
   const accent =
-    name === "market-dev" ? "#EF4444" : score === "Skipped" ? "#D1D5DB" : status === "Warning" ? "#EAB308" : "#22C55E";
+    tone === "problem" ? "#F87171" : tone === "warning" ? "#EAB308" : "#22C55E";
+  const surface =
+    tone === "problem" ? "#FFF7F7" : tone === "warning" ? "#FFFCF2" : "#F7FBF7";
   return (
-    <Paper sx={{ p: 2, borderRadius: 4, border: `1px solid ${accent}55`, bgcolor: status === "Skipped" ? "#F8FAFC" : accent === "#EF4444" ? "#FFF5F5" : "#F7FCF8", minHeight: 134 }}>
+    <Paper sx={{ p: 1.15, borderRadius: 4, border: `1px solid ${accent}55`, bgcolor: surface, minHeight: 108, boxShadow: "0 10px 24px rgba(15,23,42,0.05)" }}>
       <Box sx={{ display: "flex", justifyContent: "space-between", alignItems: "start" }}>
         <Box>
-          <Typography sx={{ fontSize: 17, fontWeight: 800, color: "#111827" }}>{name}</Typography>
-          <Typography sx={{ fontSize: 13, color: "#6B7280", mt: 0.2 }}>{type}</Typography>
+          <Typography sx={{ fontSize: 14, fontWeight: 700, color: "#111827", lineHeight: 1.1 }}>{name}</Typography>
+          <Typography sx={{ fontSize: 12, color: "#64748B", mt: 0.15 }}>{type}</Typography>
         </Box>
-        <Box sx={{ width: 10, height: 10, borderRadius: "50%", bgcolor: accent }} />
+        <Box sx={{ width: 7, height: 7, borderRadius: "50%", bgcolor: accent, mt: 0.35 }} />
       </Box>
-      <Typography sx={{ mt: 2.5, color: "#6B7280", fontSize: 14 }}>{metric}</Typography>
-      <Box sx={{ mt: 2, display: "flex", justifyContent: "flex-end" }}>
-        <Chip label={status} size="small" />
+      <Typography sx={{ mt: 1.1, color: "#4B5563", fontSize: 12.5, lineHeight: 1.3 }}>
+        {metric}
+      </Typography>
+      <Box sx={{ mt: 1.2, display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+        <Typography sx={{ color: "#64748B", fontSize: 11.5 }}>{score}</Typography>
+        <Chip
+          label={status}
+          size="small"
+          sx={{
+            bgcolor: "#E5E7EB",
+            color: "#334155",
+            fontWeight: 500,
+            height: 24,
+            "& .MuiChip-label": { px: 1 },
+          }}
+        />
+      </Box>
+    </Paper>
+  );
+}
+
+function DatabaseCard({
+  name,
+  type,
+  metric,
+  score,
+  status,
+  healthy,
+}: {
+  name: string;
+  type: string;
+  metric: string;
+  score: string;
+  status: string;
+  healthy: boolean;
+}) {
+  const indicatorColor = healthy ? "#16a34a" : "#f97316";
+  const statusBg = status === "Investigated" ? "#e5e7eb" : "#f1f5f9";
+
+  return (
+    <Paper
+      sx={{
+        p: 1.15,
+        borderRadius: 4,
+        border: `1px solid ${indicatorColor}55`,
+        bgcolor: "#F7FBF7",
+        boxShadow: "0 10px 24px rgba(15,23,42,0.05)",
+        display: "grid",
+        minHeight: 108,
+      }}
+    >
+      <Box sx={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 2 }}>
+        <Box sx={{ minWidth: 0 }}>
+          <Typography sx={{ fontSize: 14, fontWeight: 700, color: "#111827", lineHeight: 1.1 }}>
+            {name}
+          </Typography>
+          <Typography sx={{ fontSize: 12, color: "#64748B", mt: 0.15 }}>
+            {type}
+          </Typography>
+        </Box>
+
+        <Box
+          sx={{
+            width: 7,
+            height: 7,
+            borderRadius: "50%",
+            bgcolor: indicatorColor,
+            mt: 0.35,
+            flexShrink: 0,
+          }}
+        />
+      </Box>
+
+      <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 2, flexWrap: "wrap", mt: 1.1 }}>
+        <Typography sx={{ color: "#475569", fontSize: 12.5, lineHeight: 1.3 }}>
+          {metric && score ? `${metric} · ${score}` : metric || score || "-"}
+        </Typography>
+
+        <Box
+          sx={{
+            px: 1,
+            py: 0.25,
+            borderRadius: 999,
+            bgcolor: statusBg,
+            color: "#1e293b",
+            fontSize: 11,
+            fontWeight: 500,
+            lineHeight: 1,
+          }}
+        >
+          {status}
+        </Box>
       </Box>
     </Paper>
   );
@@ -1936,25 +3859,6 @@ function InvestigationCard({
   );
 }
 
-function RecommendationCard({
-  title,
-  accent,
-  items,
-}: {
-  title: string;
-  accent: string;
-  items: string[];
-}) {
-  return (
-    <Paper sx={{ p: 2, borderRadius: 4, borderLeft: `4px solid ${accent}`, minHeight: 216 }}>
-      <Typography sx={{ fontWeight: 800, color: accent, fontSize: 18 }}>{title}</Typography>
-      <Box sx={{ mt: 1.8, display: "grid", gap: 1.4 }}>
-        {items.length ? items.map((item, index) => <Bullet key={index}>{item}</Bullet>) : <Typography sx={{ color: "#6B7280" }}>No dynamic data available.</Typography>}
-      </Box>
-    </Paper>
-  );
-}
-
 function SectionCard({
   title,
   accent,
@@ -1974,11 +3878,74 @@ function SectionCard({
   );
 }
 
-function DetailLine({ label, value }: { label: string; value: string }) {
+function MiniInfoCard({ label, value }: { label: string; value: string }) {
   return (
-    <Box sx={{ display: "grid", gridTemplateColumns: "72px 1fr", gap: 2 }}>
-      <Typography sx={{ color: "#6B7280", fontSize: 10.5 }}>{label}</Typography>
-      <Typography sx={{ color: "#111827", fontSize: 10.5, fontWeight: 600, textAlign: "right" }}>{value}</Typography>
+    <Box
+      sx={{
+        p: 1.5,
+        borderRadius: 3,
+        bgcolor: "#F8FAFC",
+        border: "1px solid #E5E7EB",
+        minHeight: 138,
+      }}
+    >
+      <Typography sx={{ color: "#64748B", fontSize: 10.5, fontWeight: 800, letterSpacing: "0.08em" }}>
+        {label}
+      </Typography>
+      <Typography sx={{ mt: 0.7, color: "#111827", fontSize: 13.5, lineHeight: 1.55, maxWidth: 540 }}>
+        {value || "-"}
+      </Typography>
+    </Box>
+  );
+}
+
+function MetricLine({
+  label,
+  value,
+  tone,
+}: {
+  label: string;
+  value: string;
+  tone?: "severity" | "risk";
+}) {
+  const normalized = (value || "").toLowerCase();
+  const isSeverity = tone === "severity";
+  const pillBg =
+    isSeverity && normalized.includes("critical")
+      ? "#FEE2E2"
+      : isSeverity && normalized.includes("high")
+        ? "#FEF3C7"
+        : isSeverity && normalized.includes("medium")
+          ? "#E0F2FE"
+          : "#F1F5F9";
+  const pillFg =
+    isSeverity && normalized.includes("critical")
+      ? "#DC2626"
+      : isSeverity && normalized.includes("high")
+        ? "#B45309"
+        : isSeverity && normalized.includes("medium")
+          ? "#0369A1"
+          : "#334155";
+
+  return (
+    <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, alignItems: "center" }}>
+      <Typography sx={{ color: "#6B7280", fontSize: 12.5 }}>{label}</Typography>
+      <Box
+        sx={{
+          px: 1.2,
+          py: 0.35,
+          borderRadius: 999,
+          bgcolor: pillBg,
+          color: pillFg,
+          fontWeight: 800,
+          fontSize: 11.5,
+          lineHeight: 1.2,
+          textAlign: "right",
+          maxWidth: "65%",
+        }}
+      >
+        {value}
+      </Box>
     </Box>
   );
 }
@@ -2006,12 +3973,50 @@ function HeroStat({ label, value }: { label: string; value: string }) {
 
 function Bullet({ children }: { children: React.ReactNode }) {
   return (
-    <Typography sx={{ fontSize: 15, lineHeight: 1.55, color: "#111827" }}>
-      <Box component="span" sx={{ color: "#94A3B8", mr: 1 }}>
-        ›
-      </Box>
-      {children}
-    </Typography>
+    <Box
+      sx={{
+        display: "grid",
+        gridTemplateColumns: "14px 1fr",
+        gap: 1,
+        alignItems: "start",
+      }}
+    >
+      <Box
+        sx={{
+          mt: 0.95,
+          width: 4,
+          height: 4,
+          borderRadius: "50%",
+          bgcolor: "#94A3B8",
+          justifySelf: "center",
+        }}
+      />
+      <Typography
+        sx={{
+          fontSize: 13.5,
+          lineHeight: 1.7,
+          color: "#1F2937",
+          letterSpacing: "-0.01em",
+        }}
+      >
+        {children}
+      </Typography>
+    </Box>
+  );
+}
+
+function HeaderLabel({
+  icon,
+  text,
+}: {
+  icon: React.ReactNode;
+  text: string;
+}) {
+  return (
+    <Box sx={{ display: "flex", alignItems: "center", gap: 1, color: "#475569" }}>
+      {icon}
+      <Typography sx={{ ...panelHeadingSx, fontSize: 11 }}>{text}</Typography>
+    </Box>
   );
 }
 

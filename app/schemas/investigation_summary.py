@@ -16,6 +16,7 @@ from app.schemas.investigation_result import InvestigationResult
 from app.schemas.impact_summary import ImpactSummary
 from app.schemas.ai_investigation_result import AIInvestigationResult
 from app.schemas.log_summary import LogSummary
+from app.schemas.database_impact import DatabaseImpact
 
 
 class InvestigationSummary(BaseModel):
@@ -38,3 +39,4 @@ class InvestigationSummary(BaseModel):
     impact: ImpactSummary | None = None
     ai_result: AIInvestigationResult | None = None
     log_summary: LogSummary | None = None
+    database_impact: DatabaseImpact | None = None

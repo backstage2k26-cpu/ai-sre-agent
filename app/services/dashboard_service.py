@@ -111,6 +111,8 @@ class DashboardService:
         return {
             "total_incidents": {
                 "value": total_incidents,
+                "current_week": current_window_incidents,
+                "previous_week": previous_window_incidents,
                 "delta": self.calculate_delta(
                     current_window_incidents,
                     previous_window_incidents,
@@ -118,6 +120,8 @@ class DashboardService:
             },
             "resolved": {
                 "value": current_resolved,
+                "current_week": current_resolved,
+                "previous_week": previous_resolved,
                 "delta": self.calculate_delta(
                     current_resolved,
                     previous_resolved,
@@ -125,6 +129,8 @@ class DashboardService:
             },
             "failed": {
                 "value": current_failed,
+                "current_week": current_failed,
+                "previous_week": previous_failed,
                 "delta": self.calculate_delta(
                     current_failed,
                     previous_failed,
@@ -132,17 +138,17 @@ class DashboardService:
             },
             "high_priority_incidents": {
                 "value": current_high,
+                "current_week": current_high,
+                "previous_week": previous_high,
                 "delta": self.calculate_delta(
                     current_high,
                     previous_high,
                 ),
             },
-            "running_investigations": {
-                "value": 0,
-                "delta": 0,
-            },
             "avg_investigation_time": {
                 "value": self.format_duration(current_avg_time),
+                "current_week": self.format_duration(current_avg_time),
+                "previous_week": self.format_duration(previous_avg_time),
                 "delta": self.calculate_delta(
                     current_avg_time,
                     previous_avg_time,
@@ -150,6 +156,8 @@ class DashboardService:
             },
             "avg_confidence": {
                 "value": current_avg_confidence,
+                "current_week": current_avg_confidence,
+                "previous_week": previous_avg_confidence,
                 "delta": self.calculate_delta(
                     current_avg_confidence,
                     previous_avg_confidence,

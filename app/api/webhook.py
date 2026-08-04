@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.database.session import get_db
 from app.repositories.incident_repository import IncidentRepository
+import traceback
 
 router = APIRouter(prefix="/webhooks", tags=["Webhooks"])
 
@@ -35,7 +36,7 @@ async def servicenow_webhook(
         incident_repo.create_or_update(request.incident)
 
         existing = incident_repo.get_active_investigation(
-            request.incident.incident_id
+            request.incident.incident_number
         )
 
         if existing:
@@ -52,7 +53,6 @@ async def servicenow_webhook(
         }
 
     except Exception as exc:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=str(exc),
-        )
+        traceback.print_exc()      # <-- prints full stack trace
+        print("ERROR:", repr(exc)) # <-- prints exception
+        raise

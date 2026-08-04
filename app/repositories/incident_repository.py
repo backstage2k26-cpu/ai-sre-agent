@@ -3,6 +3,10 @@ from sqlalchemy.orm import Session
 from app.integrations.servicenow.models import IncidentContext
 from app.models.incident import Incident
 from datetime import datetime
+from app.models.investigation import (
+    Investigation,
+    InvestigationStatus,
+)
 
 
 class IncidentRepository:
@@ -188,3 +192,26 @@ class IncidentRepository:
         incident.service = service
 
         self.db.commit()
+    def get_active_investigation(
+        self,
+        incident_number: str,
+    ) -> Investigation | None:
+
+        return (
+            self.db.query(Investigation)
+            .filter(
+                Investigation.incident_number == incident_number,
+                Investigation.status.in_(
+                    [
+                        InvestigationStatus.RECEIVED.value,
+                        InvestigationStatus.QUEUED.value,
+                        InvestigationStatus.RUNNING.value,
+                        InvestigationStatus.COLLECTING_EVIDENCE.value,
+                        InvestigationStatus.AI_REASONING.value,
+                        InvestigationStatus.GENERATING_REPORT.value,
+                        InvestigationStatus.UPDATING_SERVICENOW.value,
+                    ]
+                ),
+            )
+            .first()
+        )

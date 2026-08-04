@@ -16,6 +16,7 @@ from app.services.metrics_service import MetricsService
 from app.services.knowledge_service import KnowledgeService
 from app.services.network_service import NetworkService
 from app.services.dependency_service import DependencyService
+from app.services.database_impact_service import DatabaseImpactService
 from app.services.recommendation_service import RecommendationService
 from app.services.executive_summary_service import ExecutiveSummaryService
 from app.services.investigation_result_service import (
@@ -36,6 +37,8 @@ from app.services.servicenow_update_service import (
 from app.core.config import settings
 from app.repositories.incident_repository import IncidentRepository
 from app.database.session import SessionLocal
+from app.clients.kubernetes_client import KubernetesClient
+
 
 
 class InvestigationService:
@@ -50,6 +53,7 @@ class InvestigationService:
         self.knowledge = KnowledgeService()
         self.network = NetworkService()
         self.dependency = DependencyService()
+        self.database_impact = DatabaseImpactService()
         self.knowledge_verifier = KnowledgeVerifier()
         self.correlation = CorrelationAnalyzer()
         self.evidence = EvidenceAnalyzer()
@@ -63,6 +67,8 @@ class InvestigationService:
         self.snow_update = ServiceNowUpdateService()
         self.db = SessionLocal()
         self.incident_repo = IncidentRepository(self.db)
+        self.kubernetes = KubernetesService()
+        self.kubernetes_client = KubernetesClient()
 
     async def investigate(
         self,
@@ -79,6 +85,74 @@ class InvestigationService:
         print("\n========== 1. BUILD CONTEXT ==========")
 
         context = await self.analysis.analyse(incident)
+
+        # ----------------------------------------------------
+        # Resolve actual Kubernetes resources
+        # ----------------------------------------------------
+
+        print("\n========== KUBERNETES RESOURCE DISCOVERY ==========")
+
+        application_name = context.application_name
+        discovered = None
+
+        # Analysis currently puts environment information into
+        # the namespace/service naming rather than a dedicated field.
+        environment = ""
+
+        namespace_lower = (context.namespace or "").lower()
+        application_lower = (application_name or "").lower()
+
+        for candidate in ("dev", "qa", "uat", "stage", "prod"):
+            if (
+                namespace_lower == candidate
+                or namespace_lower.endswith(f"-{candidate}")
+                or application_lower.endswith(f"-{candidate}")
+            ):
+                environment = candidate
+                break
+
+        print("AI Application :", application_name)
+        print("AI Namespace   :", context.namespace)
+        print("Environment    :", environment)
+
+        if application_name and environment:
+
+            discovered = (
+                await self.kubernetes_client.discover_application_resources(
+                    application_name=application_name,
+                    environment=environment,
+                )
+            )
+
+            if discovered:
+
+                print("✅ Kubernetes resources discovered")
+                print("Namespace  :", discovered["namespace"])
+                print("Deployment :", discovered["deployment"])
+                print("Service    :", discovered["service"])
+                print("Selector   :", discovered["pod_selector"])
+
+                # This is the important part.
+                # All downstream investigators now receive the
+                # actual Kubernetes namespace.
+                context.namespace = discovered["namespace"]
+
+            else:
+
+                print(
+                    "⚠️ No matching Kubernetes resources found for",
+                    application_name,
+                    environment,
+                )
+
+        else:
+
+            print(
+                "⚠️ Could not determine application/environment "
+                "for Kubernetes discovery"
+            )
+
+        print("===================================================\n")
 
         # -----------------------------------------
         # Update normalized service
@@ -266,6 +340,20 @@ class InvestigationService:
         )
 
         # ----------------------------------------------------
+        # Database Impact
+        # ----------------------------------------------------
+
+        print("\n========== 10. DATABASE IMPACT ==========")
+
+        summary.database_impact = await self.database_impact.investigate(
+            summary.context,
+            summary.deployment,
+            summary.logs,
+            summary.metrics,
+            summary.dependency,
+        )
+
+        # ----------------------------------------------------
         # AI Investigation Reasoner
         # ----------------------------------------------------
 
@@ -354,6 +442,28 @@ class InvestigationService:
         print("================================")
 
         summary.report = {
+            "kubernetes_resources": {
+                "namespace": (
+                    discovered.get("namespace")
+                    if discovered
+                    else summary.context.namespace
+                ),
+                "deployment": (
+                    discovered.get("deployment")
+                    if discovered
+                    else None
+                ),
+                "service": (
+                    discovered.get("service")
+                    if discovered
+                    else None
+                ),
+                "pod_selector": (
+                    discovered.get("pod_selector", {})
+                    if discovered
+                    else {}
+                ),
+            },
             "executive_summary": {
                 "root_cause": summary.executive.likely_cause,
                 "business_impact": summary.impact.business_impact,
@@ -430,6 +540,22 @@ class InvestigationService:
                     "summary": summary.dependency.assessment,
                     "findings": [],
                 },
+                "database": {
+                    "title": "Database",
+                    "summary": summary.database_impact.summary if summary.database_impact else "No database impact analysis available.",
+                    "findings": summary.database_impact.evidence if summary.database_impact else [],
+                },
+            },
+            "database": {
+                "name": summary.database_impact.database_name if summary.database_impact else summary.context.application_name,
+                "type": summary.database_impact.database_type if summary.database_impact else "Database",
+                "status": summary.database_impact.status if summary.database_impact else "Skipped",
+                "metric": summary.database_impact.metric if summary.database_impact else "",
+                "score": summary.database_impact.score if summary.database_impact else "",
+                "direction": summary.database_impact.direction if summary.database_impact else "unknown",
+                "affected_services": summary.database_impact.affected_services if summary.database_impact else [],
+                "evidence": summary.database_impact.evidence if summary.database_impact else [],
+                "summary": summary.database_impact.summary if summary.database_impact else "",
             },
             "infrastructure": [
                 {
@@ -463,10 +589,16 @@ class InvestigationService:
                     "metric": summary.deployment.assessment.summary,
                 },
                 {
-                    "name": summary.context.application_name,
+                    "name": summary.database_impact.database_name if summary.database_impact else summary.context.application_name,
                     "type": "Application",
-                    "status": summary.deployment.health_status,
-                    "metric": summary.deployment.assessment.summary,
+                    "status": summary.database_impact.status if summary.database_impact else summary.deployment.health_status,
+                    "metric": summary.database_impact.metric if summary.database_impact else summary.deployment.assessment.summary,
+                    "score": summary.database_impact.score if summary.database_impact else "",
+                    "tone": "problem"
+                    if summary.database_impact and summary.database_impact.direction == "db_caused_service_issue"
+                    else "warning"
+                    if summary.database_impact and summary.database_impact.direction == "service_caused_db_issue"
+                    else "healthy",
                 },
             ],
             "timeline": [
@@ -528,6 +660,10 @@ class InvestigationService:
                 "agent_version": f"{settings.app_name} {settings.app_env}",
             },
         }
+        print("\n========== REPORT KUBERNETES RESOURCES ==========")
+        print(summary.report.get("kubernetes_resources"))
+        print("=================================================\n")
+
         print(summary.report)
 
         if progress_callback:

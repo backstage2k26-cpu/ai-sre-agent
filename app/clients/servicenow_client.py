@@ -6,6 +6,11 @@ from datetime import datetime, timedelta
 
 class ServiceNowClient:
 
+    INCIDENT_FILTER = (
+        "active=true"
+        "^caller.name=system administrator"
+    )
+
     def __init__(self):
         self.base_url = settings.servicenow_url.rstrip("/")
         self.auth = (
@@ -20,7 +25,7 @@ class ServiceNowClient:
         url = f"{self.base_url}/api/now/table/incident"
 
         params = {
-            "sysparm_query": "active=true",
+            "sysparm_query": self.INCIDENT_FILTER,
             "sysparm_limit": limit,
             "sysparm_display_value": "true",
         }
@@ -58,7 +63,10 @@ class ServiceNowClient:
         ).strftime("%Y-%m-%d 00:00:00")
 
         params = {
-            "sysparm_query": f"sys_created_on>={start_date}",
+            "sysparm_query": (
+                f"{self.INCIDENT_FILTER}"
+                f"^sys_created_on>={start_date}"
+            ),
             "sysparm_fields": "sys_created_on,resolved_at",
             "sysparm_limit": "10000",
             "sysparm_display_value": "false",
@@ -198,7 +206,9 @@ class ServiceNowClient:
 
         params = {
             "sysparm_query": (
-                f"sys_created_on>={start_str}"
+                "active=true"
+                "^caller_id.name=system administrator"
+                f"^sys_created_on>={start_str}"
                 f"^sys_created_on<{end_str}"
             ),
             "sysparm_limit": "10000",
@@ -224,7 +234,10 @@ class ServiceNowClient:
         url = f"{self.base_url}/api/now/table/incident"
 
         params = {
-            "sysparm_query": "active=true",
+            "sysparm_query": (
+                "active=true"
+                "^caller_id.name=system administrator"
+            ),
             "sysparm_fields": "sys_id",
             "sysparm_limit": "10000",
             "sysparm_display_value": "false",

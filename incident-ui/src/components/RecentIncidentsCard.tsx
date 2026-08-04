@@ -40,6 +40,59 @@ function priorityTone(priority: string) {
   return { bgcolor: "#F3F4F6", color: "#6B7280" };
 }
 
+function incidentStatusLabel(status?: string | null) {
+  if (!status) return "Unknown";
+
+  const raw = status.toString().trim();
+  const normalized = raw.toLowerCase();
+
+  if (/^\d+$/.test(raw)) {
+    switch (raw) {
+      case "1":
+        return "New";
+      case "2":
+        return "In Progress";
+      case "3":
+        return "On Hold";
+      case "6":
+        return "Resolved";
+      case "7":
+        return "Closed";
+      case "8":
+        return "Canceled";
+      default:
+        return raw;
+    }
+  }
+
+  if (normalized.includes("new")) return "New";
+  if (normalized.includes("progress") || normalized.includes("work in progress")) return "In Progress";
+  if (normalized.includes("hold")) return "On Hold";
+  if (normalized.includes("resolv")) return "Resolved";
+  if (normalized.includes("close")) return "Closed";
+  if (normalized.includes("cancel")) return "Canceled";
+
+  return raw.charAt(0).toUpperCase() + raw.slice(1);
+}
+
+function incidentStatusPalette(status?: string | null) {
+  const label = incidentStatusLabel(status).toLowerCase();
+
+  if (label.includes("resolve") || label.includes("close") || label.includes("cancel")) {
+    return { dot: "#16A34A", bg: "#ECFDF5", fg: "#16A34A" };
+  }
+
+  if (label.includes("progress") || label.includes("hold")) {
+    return { dot: "#D97706", bg: "#FFF7E6", fg: "#D97706" };
+  }
+
+  if (label.includes("new")) {
+    return { dot: "#3B82F6", bg: "#EEF4FF", fg: "#3B82F6" };
+  }
+
+  return { dot: "#64748B", bg: "#F3F4F6", fg: "#64748B" };
+}
+
 export default function RecentIncidentsCard({
   incidents,
 }: Props) {
@@ -80,7 +133,7 @@ export default function RecentIncidentsCard({
           <Typography
             sx={{
               fontSize: 18,
-              fontWeight: 800,
+              fontWeight: 500,
               color: "var(--text-strong)",
               lineHeight: 1.1,
             }}
@@ -92,7 +145,7 @@ export default function RecentIncidentsCard({
             sx={{
               mt: 0.55,
               fontSize: 12,
-              fontWeight: 600,
+              fontWeight: 400,
               color: "var(--text-soft)",
               lineHeight: 1.2,
             }}
@@ -134,7 +187,7 @@ export default function RecentIncidentsCard({
                   background: "#F8FAFC",
                   "& .MuiTableCell-root": {
                     color: "#A8B3C7",
-                    fontWeight: 800,
+                    fontWeight: 500,
                     letterSpacing: "0.08em",
                     fontSize: 13,
                     borderBottom: "1px solid #E7EBF3",
@@ -151,20 +204,8 @@ export default function RecentIncidentsCard({
 
             <TableBody>
               {incidents.map((incident) => {
-                const state = incident.state?.toLowerCase?.() ?? "";
-                const statusLabel =
-                  state.includes("progress")
-                    ? "In Progress"
-                    : state.includes("resolve")
-                      ? "Resolved"
-                      : "New";
-
-                const statusSx =
-                  statusLabel === "Resolved"
-                    ? { bgcolor: "#ECFDF5", color: "#059669" }
-                    : statusLabel === "In Progress"
-                      ? { bgcolor: "#FFF7E6", color: "#D97706" }
-                      : { bgcolor: "#EEF4FF", color: "#3B82F6" };
+                const statusLabel = incidentStatusLabel(incident.state);
+                const statusSx = incidentStatusPalette(incident.state);
 
                 return (
                   <TableRow
@@ -179,14 +220,15 @@ export default function RecentIncidentsCard({
                       "& .MuiTableCell-root": {
                         borderBottom: "1px solid #EEF2F7",
                         fontSize: 15,
+                        fontWeight: 400,
                         py: 2.1,
                       },
                     }}
                   >
-                    <TableCell sx={{ pl: { xs: 3, md: 5 }, color: "var(--accent)", fontWeight: 800, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
+                    <TableCell sx={{ pl: { xs: 3, md: 5 }, color: "var(--accent)", fontWeight: 500, fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace" }}>
                       {incident.number}
                     </TableCell>
-                    <TableCell sx={{ color: "var(--text-strong)", maxWidth: 520, fontWeight: 500 }}>
+                    <TableCell sx={{ color: "var(--text-strong)", maxWidth: 520, fontWeight: 400 }}>
                       {incident.short_description}
                     </TableCell>
                     <TableCell>
@@ -194,24 +236,25 @@ export default function RecentIncidentsCard({
                         label={priorityLabel(incident.priority)}
                         size="small"
                         sx={{
-                          fontWeight: 800,
+                          fontWeight: 500,
                           borderRadius: 999,
                           ...priorityTone(incident.priority),
                         }}
                       />
                     </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={statusLabel}
-                        size="small"
-                        sx={{
-                          fontWeight: 800,
-                          borderRadius: 999,
-                          ...statusSx,
-                        }}
-                      />
-                    </TableCell>
-                    <TableCell sx={{ pr: { xs: 3, md: 5 }, color: "#AAB5CA" }}>
+                      <TableCell>
+                        <Chip
+                          label={statusLabel}
+                          size="small"
+                          sx={{
+                            fontWeight: 500,
+                            borderRadius: 999,
+                            bgcolor: statusSx.bg,
+                            color: statusSx.fg,
+                          }}
+                        />
+                      </TableCell>
+                    <TableCell sx={{ pr: { xs: 3, md: 5 }, color: "#AAB5CA", fontWeight: 400 }}>
                       {new Date(incident.opened_at).toLocaleString()}
                     </TableCell>
                   </TableRow>

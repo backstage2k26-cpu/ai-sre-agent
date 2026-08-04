@@ -9,9 +9,7 @@ import {
 } from "@mui/material";
 
 import DashboardIcon from "@mui/icons-material/Dashboard";
-import ReportIcon from "@mui/icons-material/Description";
 import BugReportIcon from "@mui/icons-material/BugReport";
-import SettingsIcon from "@mui/icons-material/Settings";
 import LayersOutlinedIcon from "@mui/icons-material/LayersOutlined";
 
 import { useLocation, useNavigate } from "react-router-dom";
@@ -28,16 +26,6 @@ const menus = [
     text: "Incidents",
     icon: <BugReportIcon />,
     path: "/incidents",
-  },
-  {
-    text: "Reports",
-    icon: <ReportIcon />,
-    path: "/reports",
-  },
-  {
-    text: "Settings",
-    icon: <SettingsIcon />,
-    path: "/settings",
   },
 ];
 
@@ -73,32 +61,32 @@ export default function Sidebar() {
         },
       }}
     >
-      <Box sx={{ px: 2.25, pt: 2, pb: 0 }}>
-        <Box sx={{ display: "flex", alignItems: "center", gap: 1.6 }}>
+      <Box sx={{ px: 2.25, pt: 1.6, pb: 0 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1.15 }}>
           <Box
             sx={{
-              width: 52,
-              height: 52,
-              borderRadius: "16px",
+              width: 42,
+              height: 42,
+              borderRadius: "14px",
               display: "grid",
               placeItems: "center",
               background: "linear-gradient(180deg, #FF7A3D 0%, #FF5B1F 100%)",
-              boxShadow: "0 18px 30px rgba(255, 91, 31, .28)",
+              boxShadow: "0 14px 24px rgba(255, 91, 31, .24)",
             }}
           >
-            <LayersOutlinedIcon sx={{ fontSize: 26, color: "#fff" }} />
+            <LayersOutlinedIcon sx={{ fontSize: 21, color: "#fff" }} />
           </Box>
 
           <Box>
-            <Typography sx={{ fontSize: 24, fontWeight: 800, lineHeight: 1 }}>
+            <Typography sx={{ fontSize: 18, fontWeight: 700, lineHeight: 1 }}>
               AI SRE
             </Typography>
 
             <Typography
               sx={{
-                mt: 0.35,
-                fontSize: 12,
-                letterSpacing: "0.16em",
+                mt: 0.2,
+                fontSize: 10.5,
+                letterSpacing: "0.14em",
                 color: "rgba(255,255,255,.45)",
               }}
             >
@@ -123,12 +111,12 @@ export default function Sidebar() {
             sx={{
               mb: 1.1,
               borderRadius: "16px",
-              px: 2,
-              py: 1.5,
+              px: 1.85,
+              py: 1.25,
               color: "rgba(255,255,255,.6)",
               borderLeft: "4px solid transparent",
               "& .MuiListItemIcon-root": {
-                minWidth: 32,
+                minWidth: 28,
                 color: "rgba(255,255,255,.45)",
               },
               "&.Mui-selected": {
@@ -145,7 +133,7 @@ export default function Sidebar() {
             <ListItemIcon
               sx={{
                 "& svg": {
-                  fontSize: 23,
+                  fontSize: 20,
                 },
               }}
             >
@@ -154,7 +142,7 @@ export default function Sidebar() {
 
             <ListItemText
               primary={menu.text}
-              primaryTypographyProps={{ fontSize: 17, fontWeight: 700 }}
+              primaryTypographyProps={{ fontSize: 15, fontWeight: 600 }}
             />
           </ListItemButton>
         ))}

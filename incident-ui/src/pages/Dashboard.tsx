@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
-import { Box, Button, Typography } from "@mui/material";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
 import NetworkCheckRoundedIcon from "@mui/icons-material/NetworkCheckRounded";
@@ -8,6 +7,12 @@ import CheckCircleRoundedIcon from "@mui/icons-material/CheckCircleRounded";
 import TrendingUpRoundedIcon from "@mui/icons-material/TrendingUpRounded";
 import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
 import AssistantRoundedIcon from "@mui/icons-material/AssistantRounded";
+import {
+  Box,
+  Button,
+  Typography,
+  Tooltip,
+} from "@mui/material";
 
 import KpiCard from "../components/KpiCard";
 import {
@@ -24,12 +29,14 @@ import {
   XAxis,
   YAxis,
   CartesianGrid,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   Legend,
 } from "recharts";
 
 type Metric = {
   value: number | string;
+  current_week: number | string;
+  previous_week: number | string;
   delta: number;
 };
 
@@ -190,6 +197,58 @@ const CustomTooltip = ({ active, payload, label }: any) => {
   );
 };
 
+function KpiHover({
+  title,
+  current,
+  previous,
+}: {
+  title: string;
+  current: string | number;
+  previous: string | number;
+}) {
+  return (
+    <Box
+      sx={{
+        bgcolor: "#fff",
+        color: "#111827",
+        borderRadius: 2,
+        px: 1.5,
+        py: 1.2,
+        minWidth: 170,
+      }}
+    >
+      <Typography
+        sx={{
+          fontWeight: 700,
+          fontSize: 14,
+          mb: 0.75,
+        }}
+      >
+        {title}
+      </Typography>
+
+      <Typography
+        sx={{
+          color: "#2563eb",
+          fontSize: 13,
+        }}
+      >
+        ● This Week : <strong>{current}</strong>
+      </Typography>
+
+      <Typography
+        sx={{
+          color: "#64748b",
+          fontSize: 13,
+          mt: 0.5,
+        }}
+      >
+        ● Previous Week : <strong>{previous}</strong>
+      </Typography>
+    </Box>
+  );
+}
+
 const deltaText = (delta: number) =>
   `${delta >= 0 ? "+" : ""}${delta.toFixed(1)}%`;
 
@@ -282,6 +341,11 @@ export default function Dashboard() {
         icon: "pulse",
         delta: deltaText(dashboard?.total_incidents.delta ?? 0),
         deltaTone: deltaTone(dashboard?.total_incidents.delta ?? 0),
+        currentWeek:
+            dashboard?.total_incidents.current_week ?? 0,
+
+        previousWeek:
+            dashboard?.total_incidents.previous_week ?? 0,
       },
 
       {
@@ -291,6 +355,8 @@ export default function Dashboard() {
         icon: "check",
         delta: deltaText(dashboard?.resolved.delta ?? 0),
         deltaTone: deltaTone(dashboard?.resolved.delta ?? 0),
+        currentWeek: dashboard?.resolved.current_week ?? 0,
+        previousWeek: dashboard?.resolved.previous_week ?? 0,
       },
 
       {
@@ -300,6 +366,8 @@ export default function Dashboard() {
         icon: "alert",
         delta: deltaText(dashboard?.failed?.delta ?? 0),
         deltaTone: deltaTone(dashboard?.failed?.delta ?? 0),
+        currentWeek: dashboard?.failed.current_week ?? 0,
+        previousWeek: dashboard?.failed.previous_week ?? 0,
       },
 
       {
@@ -311,6 +379,11 @@ export default function Dashboard() {
         deltaTone: deltaTone(
           dashboard?.high_priority_incidents?.delta ?? 0,
         ),
+        currentWeek:
+            dashboard?.high_priority_incidents.current_week ?? 0,
+
+        previousWeek:
+            dashboard?.high_priority_incidents.previous_week ?? 0,
       },
 
       {
@@ -327,6 +400,11 @@ export default function Dashboard() {
           dashboard?.avg_investigation_time?.delta ?? 0,
           true,
         ),
+        currentWeek:
+            dashboard?.avg_investigation_time.current_week ?? "0s",
+
+        previousWeek:
+            dashboard?.avg_investigation_time.previous_week ?? "0s",
       },
 
       {
@@ -342,6 +420,11 @@ export default function Dashboard() {
         deltaTone: deltaTone(
           dashboard?.avg_confidence?.delta ?? 0,
         ),
+        currentWeek:
+            dashboard?.avg_confidence.current_week ?? 0,
+
+        previousWeek:
+            dashboard?.avg_confidence.previous_week ?? 0,
       },
     ];
   }, [dashboard, recentIncidents]);
@@ -473,15 +556,47 @@ export default function Dashboard() {
 
         <Box className="dashboard-stats">
           {kpis.map((stat) => (
-            <KpiCard
+            <Tooltip
               key={stat.title}
-              title={stat.title}
-              value={stat.value}
-              tone={stat.tone}
-              icon={stat.icon}
-              delta={stat.delta}
-              deltaTone={stat.deltaTone}
-            />
+              arrow
+              placement="top"
+              enterDelay={150}
+              slotProps={{
+                tooltip: {
+                  sx: {
+                    bgcolor: "#fff",
+                    color: "#111827",
+                    borderRadius: 2,
+                    boxShadow: "0 10px 30px rgba(0,0,0,.12)",
+                    border: "1px solid #E5E7EB",
+                    p: 0,
+                  },
+                },
+                arrow: {
+                  sx: {
+                    color: "#fff",
+                  },
+                },
+              }}
+              title={
+                <KpiHover
+                  title={stat.title}
+                  current={stat.currentWeek}
+                  previous={stat.previousWeek}
+                />
+              }
+            >
+              <Box>
+                <KpiCard
+                  title={stat.title}
+                  value={stat.value}
+                  tone={stat.tone}
+                  icon={stat.icon}
+                  delta={stat.delta}
+                  deltaTone={stat.deltaTone}
+                />
+              </Box>
+            </Tooltip>
           ))}
         </Box>
 
@@ -549,7 +664,7 @@ export default function Dashboard() {
                     allowDecimals={false}
                   />
 
-                  <Tooltip content={<CustomTooltip />} />
+                  <RechartsTooltip content={<CustomTooltip />} />
 
                   <Line
                     type="monotone"
