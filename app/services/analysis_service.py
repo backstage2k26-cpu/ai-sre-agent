@@ -10,14 +10,12 @@ from app.utils.incident_utils import (
 )
 from app.schemas.incident_intent import IncidentIntent
 from app.resolvers.application_resolver import ApplicationResolver
-from app.utils.incident_utils import get_search_window
 
 
 class AnalysisService:
 
     def __init__(self):
 
-        self.llm = LLMClient()
         self.llm = LLMClient()
         self.resolver = ApplicationResolver()
 
@@ -96,7 +94,12 @@ class AnalysisService:
         # Resolve Application
         # -------------------------------
 
-        context = self.resolver.resolve(intent)
+        context = await self.resolver.resolve(intent)
+        normalized_service = context.application_name
+        normalized_service = (
+            context.application_name
+            or context.namespace
+        )
 
         print("\n========== APPLICATION CONTEXT ==========")
         print(context)
@@ -108,7 +111,9 @@ class AnalysisService:
             incident_number=incident.number,
             service_name=context.service_name,
             application_name=context.application_name,
+            argocd_application=context.argocd_application,
             namespace=context.namespace,
+            normalized_service=normalized_service,
             problem_type=context.problem_type,
             priority=priority,
             search_window_minutes=get_search_window(priority),

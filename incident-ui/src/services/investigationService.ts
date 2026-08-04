@@ -78,3 +78,26 @@ export async function getInvestigation(investigationId: string) {
 
   return response.json();
 }
+
+export type SimilarIncident = {
+  incident: string;
+  application: string;
+  root_cause: string;
+  resolution: string;
+  status: string;
+  similarity: number;
+};
+
+export async function getSimilarIncidents(
+  investigationId: string
+): Promise<SimilarIncident[]> {
+  const response = await fetch(
+    `${API}/investigations/${investigationId}/similar-incidents`
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to fetch similar incidents");
+  }
+
+  return response.json();
+}

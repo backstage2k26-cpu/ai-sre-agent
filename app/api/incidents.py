@@ -74,14 +74,22 @@ def get_incident_details(
         "incident": {
             "number": incident.number,
             "short_description": incident.short_description,
-            "service": incident.service,
-            "configuration_item": incident.configuration_item,
+            "application_name": (
+                getattr(incident, "cmdb_ci", None)
+                or getattr(incident, "business_service", None)
+                or getattr(incident, "service", None)
+                or getattr(incident, "configuration_item", None)
+            ),
+            "service": getattr(incident, "service", None),
+            "configuration_item": getattr(incident, "configuration_item", None),
+            "cmdb_ci": getattr(incident, "cmdb_ci", None),
+            "business_service": getattr(incident, "business_service", None),
             "priority": incident.priority,
             "state": incident.state,
-            "caller": incident.caller,
-            "assignment_group": incident.assignment_group,
-            "opened_at": incident.opened_at,
-            "updated_at": incident.updated_at,
+            "caller": getattr(incident, "caller", None),
+            "assignment_group": getattr(incident, "assignment_group", None),
+            "opened_at": getattr(incident, "opened_at", None),
+            "updated_at": getattr(incident, "updated_at", None),
         },
         "investigations": [
             {

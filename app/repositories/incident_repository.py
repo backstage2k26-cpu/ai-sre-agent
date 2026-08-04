@@ -2,6 +2,11 @@ from sqlalchemy.orm import Session
 
 from app.integrations.servicenow.models import IncidentContext
 from app.models.incident import Incident
+from datetime import datetime
+from app.models.investigation import (
+    Investigation,
+    InvestigationStatus,
+)
 
 
 class IncidentRepository:
@@ -22,7 +27,11 @@ class IncidentRepository:
 
             existing.sys_id = incident.incident_id
             existing.short_description = incident.short_description
-            existing.service = incident.configuration_item
+            existing.service = (
+                incident.configuration_item
+                or existing.service
+                or "unknown"
+            )
             existing.priority = incident.priority
             existing.severity = incident.severity
             existing.state = incident.state
@@ -41,7 +50,10 @@ class IncidentRepository:
             number=incident.incident_number,
             sys_id=incident.incident_id,
             short_description=incident.short_description,
-            service=incident.configuration_item,
+            service=(
+                incident.configuration_item
+                or "unknown"
+            ),
             priority=incident.priority,
             severity=incident.severity,
             state=incident.state,
@@ -122,6 +134,84 @@ class IncidentRepository:
             self.db.query(Incident)
             .filter(
                 Incident.number == incident_number
+            )
+            .first()
+        )
+    
+    def count_between(
+        self,
+        start: datetime,
+        end: datetime,
+        ) -> int:
+        return (
+            self.db.query(Incident)
+            .filter(
+                Incident.opened_at >= start,
+                Incident.opened_at < end,
+            )
+            .count()
+        )
+    
+    def count_high_priority_between(
+        self,
+        start: datetime,
+        end: datetime,
+    ) -> int:
+        return (
+            self.db.query(Incident)
+            .filter(
+                Incident.opened_at >= start,
+                Incident.opened_at < end,
+                Incident.priority.in_(
+                    [
+                        "1",
+                        "2",
+                        "P1",
+                        "P2",
+                        "Critical",
+                        "High",
+                    ]
+                ),
+            )
+            .count()
+        )
+    
+    def update_service(
+        self,
+        incident_number: str,
+        service: str,
+    ) -> None:
+
+        incident = self.find_by_number(
+            incident_number
+        )
+
+        if incident is None:
+            return
+
+        incident.service = service
+
+        self.db.commit()
+    def get_active_investigation(
+        self,
+        incident_number: str,
+    ) -> Investigation | None:
+
+        return (
+            self.db.query(Investigation)
+            .filter(
+                Investigation.incident_number == incident_number,
+                Investigation.status.in_(
+                    [
+                        InvestigationStatus.RECEIVED.value,
+                        InvestigationStatus.QUEUED.value,
+                        InvestigationStatus.RUNNING.value,
+                        InvestigationStatus.COLLECTING_EVIDENCE.value,
+                        InvestigationStatus.AI_REASONING.value,
+                        InvestigationStatus.GENERATING_REPORT.value,
+                        InvestigationStatus.UPDATING_SERVICENOW.value,
+                    ]
+                ),
             )
             .first()
         )

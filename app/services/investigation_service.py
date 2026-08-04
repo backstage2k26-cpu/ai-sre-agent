@@ -2,6 +2,7 @@ import asyncio
 import time
 
 from openai import APITimeoutError, APIError
+from datetime import datetime, UTC
 
 from app.schemas.incident import Incident
 from app.schemas.investigation_summary import InvestigationSummary
@@ -15,6 +16,7 @@ from app.services.metrics_service import MetricsService
 from app.services.knowledge_service import KnowledgeService
 from app.services.network_service import NetworkService
 from app.services.dependency_service import DependencyService
+from app.services.database_impact_service import DatabaseImpactService
 from app.services.recommendation_service import RecommendationService
 from app.services.executive_summary_service import ExecutiveSummaryService
 from app.services.investigation_result_service import (
@@ -32,6 +34,11 @@ from app.analyzers.log_analyzer import LogAnalyzer
 from app.services.servicenow_update_service import (
     ServiceNowUpdateService,
 )
+from app.core.config import settings
+from app.repositories.incident_repository import IncidentRepository
+from app.database.session import SessionLocal
+from app.clients.kubernetes_client import KubernetesClient
+
 
 
 class InvestigationService:
@@ -46,6 +53,7 @@ class InvestigationService:
         self.knowledge = KnowledgeService()
         self.network = NetworkService()
         self.dependency = DependencyService()
+        self.database_impact = DatabaseImpactService()
         self.knowledge_verifier = KnowledgeVerifier()
         self.correlation = CorrelationAnalyzer()
         self.evidence = EvidenceAnalyzer()
@@ -57,6 +65,10 @@ class InvestigationService:
         self.reasoner = InvestigationReasoner()
         self.log_analyzer = LogAnalyzer()
         self.snow_update = ServiceNowUpdateService()
+        self.db = SessionLocal()
+        self.incident_repo = IncidentRepository(self.db)
+        self.kubernetes = KubernetesService()
+        self.kubernetes_client = KubernetesClient()
 
     async def investigate(
         self,
@@ -73,10 +85,96 @@ class InvestigationService:
         print("\n========== 1. BUILD CONTEXT ==========")
 
         context = await self.analysis.analyse(incident)
-        if progress_callback:
-            progress_callback(20, "Building Context")
 
-        print(context)
+        # ----------------------------------------------------
+        # Resolve actual Kubernetes resources
+        # ----------------------------------------------------
+
+        print("\n========== KUBERNETES RESOURCE DISCOVERY ==========")
+
+        application_name = context.application_name
+        discovered = None
+
+        # Analysis currently puts environment information into
+        # the namespace/service naming rather than a dedicated field.
+        environment = ""
+
+        namespace_lower = (context.namespace or "").lower()
+        application_lower = (application_name or "").lower()
+
+        for candidate in ("dev", "qa", "uat", "stage", "prod"):
+            if (
+                namespace_lower == candidate
+                or namespace_lower.endswith(f"-{candidate}")
+                or application_lower.endswith(f"-{candidate}")
+            ):
+                environment = candidate
+                break
+
+        print("AI Application :", application_name)
+        print("AI Namespace   :", context.namespace)
+        print("Environment    :", environment)
+
+        if application_name and environment:
+
+            discovered = (
+                await self.kubernetes_client.discover_application_resources(
+                    application_name=application_name,
+                    environment=environment,
+                )
+            )
+
+            if discovered:
+
+                print("✅ Kubernetes resources discovered")
+                print("Namespace  :", discovered["namespace"])
+                print("Deployment :", discovered["deployment"])
+                print("Service    :", discovered["service"])
+                print("Selector   :", discovered["pod_selector"])
+
+                # This is the important part.
+                # All downstream investigators now receive the
+                # actual Kubernetes namespace.
+                context.namespace = discovered["namespace"]
+
+            else:
+
+                print(
+                    "⚠️ No matching Kubernetes resources found for",
+                    application_name,
+                    environment,
+                )
+
+        else:
+
+            print(
+                "⚠️ Could not determine application/environment "
+                "for Kubernetes discovery"
+            )
+
+        print("===================================================\n")
+
+        # -----------------------------------------
+        # Update normalized service
+        # -----------------------------------------
+
+        print("========== UPDATE SERVICE ==========")
+        print("Application :", context.application_name)
+        print("Namespace   :", context.namespace)
+        print("Normalized  :", getattr(context, "normalized_service", None))
+
+        if getattr(context, "normalized_service", None):
+
+            print("Calling update_service()")
+
+            self.incident_repo.update_service(
+                incident_number=incident.number,
+                service=context.normalized_service,
+            )
+
+            print(f"Updated service -> {context.normalized_service}")
+        else:
+            print("normalized_service is empty")
 
         # ----------------------------------------------------
         # Collect Evidence
@@ -191,10 +289,10 @@ class InvestigationService:
         # ----------------------------------------------------
         # Recommendations
         # ----------------------------------------------------
-
         print("\n========== 7. RECOMMENDATIONS ==========")
 
         summary.recommendations = self.recommendations.generate(summary)
+
         if progress_callback:
             progress_callback(75, "Generating Recommendations")
 
@@ -242,6 +340,20 @@ class InvestigationService:
         )
 
         # ----------------------------------------------------
+        # Database Impact
+        # ----------------------------------------------------
+
+        print("\n========== 10. DATABASE IMPACT ==========")
+
+        summary.database_impact = await self.database_impact.investigate(
+            summary.context,
+            summary.deployment,
+            summary.logs,
+            summary.metrics,
+            summary.dependency,
+        )
+
+        # ----------------------------------------------------
         # AI Investigation Reasoner
         # ----------------------------------------------------
 
@@ -282,45 +394,280 @@ class InvestigationService:
         print("========================================\n")
 
         # ----------------------------------------------------
-        # Report
-        # ----------------------------------------------------
-
-        print("\n========== 12. REPORT ==========")
-
-        summary.report = (
-            f"""Incident {context.incident_number}
-
-Service: {context.service_name}
-
-Root Cause:
-{summary.correlation.probable_root_cause}
-
-Confidence:
-{summary.correlation.confidence}
-
-Recommendation:
-"""
-            + (
-                summary.knowledge.matches[0].recommendation
-                if summary.knowledge.matches
-                else "No recommendation available."
-            )
-        )
-        if progress_callback:
-            progress_callback(90, "Generating Report")
-
-        # ----------------------------------------------------
         # Timeline
         # ----------------------------------------------------
 
-        print("\n========== 13. TIMELINE ==========")
+        print("\n========== 12. TIMELINE ==========")
 
         summary.timeline = self.timeline_service.build(
             context=context,
             investigation=summary,
         )
+
         if progress_callback:
-            progress_callback(95, "Building Timeline")
+            progress_callback(90, "Building Timeline")
+
+
+        # ----------------------------------------------------
+        # Report
+        # ----------------------------------------------------
+
+        completed_at = datetime.now(UTC)
+        started_at_dt = datetime.fromtimestamp(started_at, UTC)
+        print("\n========== 13. REPORT ==========")
+        # ----------------------------------------------------
+        # Normalize application / environment
+        # ----------------------------------------------------
+
+        import re
+
+        namespace = summary.context.namespace or ""
+        application = summary.context.application_name or namespace
+        environment = "Unknown"
+
+        match = re.match(
+            r"^(.*?)-(dev|qa|uat|prod|stage)$",
+            namespace,
+            re.IGNORECASE,
+        )
+
+        if match:
+            application = match.group(1)
+            environment = match.group(2)
+
+        print("================================")
+        print("Namespace   :", namespace)
+        print("Application :", application)
+        print("Environment :", environment)
+        print("================================")
+
+        summary.report = {
+            "kubernetes_resources": {
+                "namespace": (
+                    discovered.get("namespace")
+                    if discovered
+                    else summary.context.namespace
+                ),
+                "deployment": (
+                    discovered.get("deployment")
+                    if discovered
+                    else None
+                ),
+                "service": (
+                    discovered.get("service")
+                    if discovered
+                    else None
+                ),
+                "pod_selector": (
+                    discovered.get("pod_selector", {})
+                    if discovered
+                    else {}
+                ),
+            },
+            "executive_summary": {
+                "root_cause": summary.executive.likely_cause,
+                "business_impact": summary.impact.business_impact,
+                "current_status": summary.investigation_result.status,
+                "severity": context.priority,
+                "owner": summary.executive.recommended_owner,
+                "risk": summary.ai_result.business_impact if summary.ai_result else "",
+                "summary": summary.executive.summary,
+            },
+            "ai_investigation": {
+                "diagnosis": summary.ai_result.diagnosis,
+                "root_cause": {
+                    "title": summary.ai_result.root_cause.title,
+                    "description": summary.ai_result.root_cause.description,
+                },
+                "confidence": summary.ai_result.confidence,
+                "business_impact": summary.ai_result.business_impact,
+                "resolution_plan": summary.ai_result.resolution_plan,
+                "prevention": summary.ai_result.prevention,
+                "reasoning": summary.ai_result.reasoning,
+                "estimated_recovery_time": summary.ai_result.estimated_recovery_time,
+                "failure_point": summary.correlation.probable_root_cause,
+                "primary_evidence": summary.correlation.findings,
+                "alternatives": [],
+            },
+            "hero": {
+                "eyebrow": "AI INVESTIGATION REPORT",
+                "short_description": incident.short_description,
+                "description": incident.description,
+
+                "application": application,
+                "environment": environment,
+                "location": getattr(summary.context, "location", ""),
+
+                "confidence": summary.ai_result.confidence,
+                "duration": summary.investigation_result.investigation_time,
+                "components": 14,
+                "eta": summary.ai_result.estimated_recovery_time,
+                "generated_at": completed_at.isoformat(),
+
+                "version": f"{settings.app_name} {settings.app_env}",
+
+                "cause": summary.ai_result.root_cause.title,
+                "how": summary.ai_result.root_cause.description,
+            },
+            "technical_investigation": {
+                "logs": {
+                    "title": "Logs",
+                    "summary": summary.logs.assessment.summary,
+                    "findings": getattr(summary.logs.assessment, "findings", []),
+                },
+                "metrics": {
+                    "title": "Metrics",
+                    "summary": summary.metrics.assessment.summary,
+                    "findings": getattr(summary.metrics.assessment, "findings", []),
+                },
+                "deployment": {
+                    "title": "Deployment",
+                    "summary": summary.deployment.assessment.summary,
+                    "findings": getattr(summary.deployment.assessment, "findings", []),
+                },
+                "kubernetes": {
+                    "title": "Kubernetes",
+                    "summary": summary.kubernetes.assessment.summary,
+                    "findings": getattr(summary.kubernetes.assessment, "findings", []),
+                },
+                "network": {
+                    "title": "Network",
+                    "summary": summary.network.assessment,
+                    "findings": [],
+                },
+                "dependency": {
+                    "title": "Dependencies",
+                    "summary": summary.dependency.assessment,
+                    "findings": [],
+                },
+                "database": {
+                    "title": "Database",
+                    "summary": summary.database_impact.summary if summary.database_impact else "No database impact analysis available.",
+                    "findings": summary.database_impact.evidence if summary.database_impact else [],
+                },
+            },
+            "database": {
+                "name": summary.database_impact.database_name if summary.database_impact else summary.context.application_name,
+                "type": summary.database_impact.database_type if summary.database_impact else "Database",
+                "status": summary.database_impact.status if summary.database_impact else "Skipped",
+                "metric": summary.database_impact.metric if summary.database_impact else "",
+                "score": summary.database_impact.score if summary.database_impact else "",
+                "direction": summary.database_impact.direction if summary.database_impact else "unknown",
+                "affected_services": summary.database_impact.affected_services if summary.database_impact else [],
+                "evidence": summary.database_impact.evidence if summary.database_impact else [],
+                "summary": summary.database_impact.summary if summary.database_impact else "",
+            },
+            "infrastructure": [
+                {
+                    "name": "Grafana",
+                    "type": "Observability",
+                    "status": "Healthy",
+                    "metric": "Connected",
+                },
+                {
+                    "name": "Loki",
+                    "type": "Logs",
+                    "status": "Healthy",
+                    "metric": f"{summary.log_summary.total_logs} logs analysed",
+                },
+                {
+                    "name": "Prometheus",
+                    "type": "Metrics",
+                    "status": "Healthy",
+                    "metric": "Metrics collected",
+                },
+                {
+                    "name": "Kubernetes",
+                    "type": "Cluster",
+                    "status": summary.deployment.health_status,
+                    "metric": summary.kubernetes.assessment.summary,
+                },
+                {
+                    "name": "ArgoCD",
+                    "type": "Deployment",
+                    "status": summary.deployment.sync_status,
+                    "metric": summary.deployment.assessment.summary,
+                },
+                {
+                    "name": summary.database_impact.database_name if summary.database_impact else summary.context.application_name,
+                    "type": "Application",
+                    "status": summary.database_impact.status if summary.database_impact else summary.deployment.health_status,
+                    "metric": summary.database_impact.metric if summary.database_impact else summary.deployment.assessment.summary,
+                    "score": summary.database_impact.score if summary.database_impact else "",
+                    "tone": "problem"
+                    if summary.database_impact and summary.database_impact.direction == "db_caused_service_issue"
+                    else "warning"
+                    if summary.database_impact and summary.database_impact.direction == "service_caused_db_issue"
+                    else "healthy",
+                },
+            ],
+            "timeline": [
+                {
+                    "time": item.get("time", ""),
+                    "title": item.get("event", ""),
+                    "description": "",
+                    "severity": "Info",
+                }
+                for item in summary.timeline
+            ],
+            "recommendations": [
+                {
+                    "title": rec.action,
+                    "description": rec.reason,
+                    "priority": rec.priority,
+                    "owner": "",
+                }
+                for rec in summary.recommendations.recommendations
+            ],
+            "evidence": {
+                "primary": [
+                    finding
+                    for finding in getattr(summary.correlation, "findings", [])
+                ],
+                "supporting": [
+                    evidence
+                    for evidence in getattr(summary.evidence, "supporting_evidence", [])
+                ],
+                "contradictions": [
+                    evidence
+                    for evidence in getattr(summary.evidence, "contradicting_evidence", [])
+                ],
+            },
+            "recovery": {
+                "estimated_time": summary.ai_result.estimated_recovery_time,
+                "resolution_plan": summary.ai_result.resolution_plan,
+                "prevention": summary.ai_result.prevention,
+            },
+            "incident": {
+                "number": incident.number,
+                "short_description": incident.short_description,
+                "description": incident.description,
+                "priority": context.priority,
+                "state": incident.state,
+
+                "application": application,
+                "environment": environment,
+                "namespace": summary.context.namespace,
+
+                "started_at": started_at_dt.isoformat(),
+                "completed_at": completed_at.isoformat(),
+                "duration_seconds": summary.investigation_result.investigation_time,
+            },
+            "footer": {
+                "report_id": f"RPT-{incident.number}",
+                "generated_at": completed_at.isoformat(),
+                "investigation_duration": summary.investigation_result.investigation_time,
+                "agent_version": f"{settings.app_name} {settings.app_env}",
+            },
+        }
+        print("\n========== REPORT KUBERNETES RESOURCES ==========")
+        print(summary.report.get("kubernetes_resources"))
+        print("=================================================\n")
+
+        print(summary.report)
+
+        if progress_callback:
+            progress_callback(95, "Generating Report")
 
         print("\n========== INVESTIGATION COMPLETE ==========\n")
 

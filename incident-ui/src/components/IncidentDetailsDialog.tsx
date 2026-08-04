@@ -1,18 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import {
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  Button,
-  Typography,
   Box,
+  Button,
   CircularProgress,
+  Dialog,
+  Divider,
   IconButton,
+  Typography,
 } from "@mui/material";
+import CloseIcon from "@mui/icons-material/Close";
 import ReplayRoundedIcon from "@mui/icons-material/ReplayRounded";
 import DescriptionOutlinedIcon from "@mui/icons-material/DescriptionOutlined";
-import CloseIcon from "@mui/icons-material/Close";
-import { useNavigate } from "react-router-dom";
+import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
+
 import {
   getIncidentDetails,
   restartInvestigation,
@@ -35,11 +36,21 @@ export default function IncidentDetailsDialog({
 
   const navigate = useNavigate();
 
+  const incident = details?.incident;
+  const investigation = details?.investigations?.[0];
+
+  const resolvedService = useMemo(() => resolveApplicationName(incident), [incident]);
+  const resolvedPriority = useMemo(() => resolvePriority(incident?.priority), [incident?.priority]);
+  const incidentStatus = useMemo(() => normalizeStatus(incident?.state), [incident?.state]);
+  const investigationStatus = useMemo(
+    () => resolveInvestigationLabel(investigation?.status),
+    [investigation?.status],
+  );
+
   const formatDateTime = (value?: string | null) => {
     if (!value) return "-";
 
     const date = new Date(value);
-
     if (Number.isNaN(date.getTime())) return "-";
 
     return new Intl.DateTimeFormat("en-GB", {
@@ -48,7 +59,6 @@ export default function IncidentDetailsDialog({
       year: "numeric",
       hour: "2-digit",
       minute: "2-digit",
-      second: "2-digit",
       hour12: false,
     }).format(date);
   };
@@ -58,17 +68,7 @@ export default function IncidentDetailsDialog({
 
     try {
       setLoading(true);
-
       const data = await getIncidentDetails(incidentNumber);
-      console.log("Incident:", data.incident);
-      console.log("Investigations:", data.investigations);
-      console.log("Application fields:", {
-        service: data.incident.service,
-        application: data.incident.application,
-        app_name: data.incident.app_name,
-        application_name: data.incident.application_name,
-      });
-
       setDetails(data);
     } catch (err) {
       console.error(err);
@@ -78,19 +78,16 @@ export default function IncidentDetailsDialog({
   };
 
   const handleRestart = async () => {
-    if (!details) return;
+    if (!incident?.number) return;
 
     const confirmed = window.confirm(
-      "Restarting will replace the current investigation report.\n\nContinue?"
+      "Restarting will replace the current investigation report.\n\nContinue?",
     );
-
     if (!confirmed) return;
 
     try {
       setRestarting(true);
-
-      await restartInvestigation(details.incident.number);
-
+      await restartInvestigation(incident.number);
       await loadIncident();
     } catch (err) {
       console.error(err);
@@ -105,10 +102,7 @@ export default function IncidentDetailsDialog({
 
     loadIncident();
 
-    const interval = setInterval(() => {
-      loadIncident();
-    }, 5000);
-
+    const interval = setInterval(loadIncident, 5000);
     return () => clearInterval(interval);
   }, [open, incidentNumber]);
 
@@ -116,444 +110,471 @@ export default function IncidentDetailsDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      maxWidth={false}
+      fullScreen
       slotProps={{
         backdrop: {
           sx: {
-            backgroundColor: "rgba(15, 23, 42, 0.65)",
-            backdropFilter: "blur(18px)",
+            backgroundColor: "rgba(3, 7, 18, 0.62)",
+            backdropFilter: "blur(1px)",
           },
         },
         paper: {
           sx: {
-            width: "min(780px, calc(100vw - 24px))",
-            maxWidth: "780px",
-            borderRadius: "20px",
+            margin: 0,
+            width: "100vw",
+            maxWidth: "100vw",
+            height: "100vh",
+            borderRadius: 0,
             overflow: "hidden",
-            backgroundColor: "#FFFFFF",
-            color: "#1F2937",
-            boxShadow: "0 16px 36px rgba(15, 23, 42, 0.22)",
+            backgroundColor: "transparent",
           },
         },
       }}
     >
-      <DialogTitle
-        sx={{
-          position: "relative",
-          px: { xs: 2, md: 3 },
-          pt: { xs: 2, md: 2.25 },
-          pb: { xs: 2, md: 2.25 },
-        }}
-      >
-        <Box sx={{ pr: 7 }}>
-          <Typography
-            sx={{
-              fontSize: 13,
-              fontWeight: 800,
-              letterSpacing: "0.14em",
-              color: "#FF6B00",
-            }}
-          >
-            INCIDENT DETAILS
-          </Typography>
-
-          <Typography
-            sx={{
-              mt: 1,
-              fontSize: { xs: 22, md: 26 },
-              lineHeight: 1.05,
-              fontWeight: 800,
-              letterSpacing: "-0.04em",
-              color: "#172033",
-            }}
-          >
-            {details?.incident?.number ?? incidentNumber ?? "-"}
-          </Typography>
-
-          <Typography
-            sx={{
-              mt: 1,
-              fontSize: { xs: 13, md: 15 },
-              lineHeight: 1.45,
-              color: "#718096",
-              fontWeight: 500,
-            }}
-          >
-            {details?.incident?.short_description ?? "Loading incident details..."}
-          </Typography>
-        </Box>
-
-        <IconButton
-          onClick={onClose}
-          sx={{
-            position: "absolute",
-            right: { xs: 10, md: 12 },
-            top: { xs: 10, md: 12 },
-            width: 44,
-            height: 44,
-            bgcolor: "#F3F4F6",
-            color: "#7C8597",
-            "&:hover": {
-              bgcolor: "#E5E7EB",
-            },
-          }}
-        >
-          <CloseIcon sx={{ fontSize: 24 }} />
-        </IconButton>
-      </DialogTitle>
-
-      <DialogContent
-        sx={{
-          px: { xs: 2, md: 3 },
-          pb: { xs: 2, md: 2.5 },
-          pt: 0,
-        }}
-      >
-        {loading ? (
-          <Box
-            sx={{
-              display: "flex",
-              justifyContent: "center",
-              py: 4,
-            }}
-          >
-            <CircularProgress />
-          </Box>
-        ) : details ? (
-          <Box
-            sx={{
-              pt: { xs: 1.5, md: 2 },
-              borderTop: "1px solid #E9EEF5",
-            }}
-          >
-            <Box
-              sx={{
-                display: "grid",
-                gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-                columnGap: 5,
-                rowGap: 2.5,
-              }}
-            >
-              <DetailItem
-                label="SERVICE"
-                value={resolveServiceName(details.incident)}
-                badge
-                badgeColor="#E8EEF8"
-                badgeTextColor="#64748B"
-              />
-
-              <DetailItem
-                label="PRIORITY"
-                value={resolvePriority(details.incident.priority)}
-                badgeColor="#FDE8E8"
-                badgeTextColor="#C62828"
-                badge
-              />
-
-              <DetailItem
-                label="STATUS"
-                value={details.incident.state ?? "-"}
-                badgeColor="#D7E7FF"
-                badgeTextColor="#1D4ED8"
-                badge
-              />
-
-              <DetailItem
-                label="INVESTIGATION STATUS"
-                value={resolveInvestigationLabel(
-                  details?.investigations?.[0]?.status,
-                )}
-                badge
-                badgeColor={investigationBadgeColor(
-                  details?.investigations?.[0]?.status,
-                )}
-                badgeTextColor={investigationBadgeTextColor(
-                  details?.investigations?.[0]?.status,
-                )}
-              />
-
-              <DetailItem
-                label="CREATED AT"
-                value={formatDateTime(details.incident.opened_at)}
-              />
-            </Box>
-          </Box>
-        ) : (
-          <Typography>No data available.</Typography>
-        )}
-      </DialogContent>
-
       <Box
         sx={{
-          px: { xs: 2, md: 3 },
-          pb: { xs: 2, md: 2.5 },
+          display: "grid",
+          gridTemplateColumns: { xs: "1fr", lg: "1.15fr 0.85fr" },
+          width: "100%",
+          height: "100%",
+          bgcolor: "transparent",
         }}
       >
         <Box
           sx={{
-            pt: { xs: 1.5, md: 2 },
-            borderTop: "1px solid #E9EEF5",
-            display: "grid",
-            gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
-            gap: 1.5,
+            display: { xs: "none", lg: "block" },
+            bgcolor: "rgba(3, 7, 18, 0.55)",
+          }}
+        />
+
+        <Box
+          sx={{
+            position: "relative",
+            bgcolor: "#FFFFFF",
+            color: "#1F2937",
+            height: "100%",
+            display: "flex",
+            flexDirection: "column",
+            boxShadow: "-12px 0 40px rgba(15, 23, 42, 0.24)",
           }}
         >
-          <Button
-            variant="outlined"
-            disabled={restarting}
-            onClick={handleRestart}
-            startIcon={<ReplayRoundedIcon />}
+          <IconButton
+            onClick={onClose}
+            aria-label="Close dialog"
             sx={{
-              minHeight: 44,
-              px: 2,
-              borderRadius: "12px",
-              borderWidth: 2,
-              borderColor: "#FF6B00",
-              color: "#FF6B00",
-              fontSize: 13,
-              fontWeight: 800,
-              textTransform: "none",
-              "& .MuiButton-startIcon": {
-                marginRight: 0.75,
-              },
-              "& svg": {
-                fontSize: 18,
-              },
+              position: "absolute",
+              top: 14,
+              right: 14,
+              width: 40,
+              height: 40,
+              border: "2px solid #94A3B8",
+              color: "#64748B",
+              bgcolor: "#FFFFFF",
+              zIndex: 2,
               "&:hover": {
-                borderWidth: 2,
-                borderColor: "#E55C00",
-                bgcolor: "rgba(255, 107, 0, 0.06)",
+                bgcolor: "#F8FAFC",
               },
             }}
           >
-            {restarting ? "Rerunning..." : "Rerun Investigation"}
-          </Button>
+            <CloseIcon sx={{ fontSize: 24 }} />
+          </IconButton>
 
-          <Button
-            variant="contained"
-            disabled={!details?.investigations?.[0]?.investigation_id}
-            onClick={() => {
-              const investigationId =
-                details?.investigations?.[0]?.investigation_id;
+          <Box sx={{ px: { xs: 2.5, md: 3.5 }, pt: { xs: 3, md: 4 }, pb: 2.2 }}>
+            <Box sx={{ display: "flex", alignItems: "flex-start", gap: 2 }}>
+              <Box
+                sx={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 2.5,
+                  bgcolor: "#F3F4F6",
+                  display: "grid",
+                  placeItems: "center",
+                  flexShrink: 0,
+                }}
+              >
+                <ErrorOutlineRoundedIcon sx={{ color: "#334155", fontSize: 24 }} />
+              </Box>
 
-              if (!investigationId) return;
+              <Box sx={{ pt: 0.1 }}>
+                <Typography
+                  sx={{
+                    fontFamily: '"SFMono-Regular", ui-monospace, monospace',
+                    fontSize: 13,
+                    letterSpacing: "0.08em",
+                    color: "#64748B",
+                    mb: 0.25,
+                  }}
+                >
+                  {incident?.number ?? incidentNumber ?? "-"}
+                </Typography>
 
-              navigate(`/reports/${investigationId}`);
-            }}
-            startIcon={<DescriptionOutlinedIcon />}
+                <Typography
+                  sx={{
+                    fontSize: { xs: 24, md: 28 },
+                    lineHeight: 1.08,
+                    fontWeight: 800,
+                    letterSpacing: "-0.05em",
+                    color: "#111827",
+                  }}
+                >
+                  {resolvedService}
+                </Typography>
+
+                <Box sx={{ display: "flex", gap: 0.9, mt: 1.1, flexWrap: "wrap" }}>
+                  <StatusChip
+                    label={resolvedPriority}
+                    dotColor="#EF4444"
+                    bg="#FEF2F2"
+                    text="#DC2626"
+                  />
+                  <StatusChip
+                    label={incidentStatus}
+                    dotColor="#3B82F6"
+                    bg="#EFF6FF"
+                    text="#2563EB"
+                  />
+                </Box>
+              </Box>
+            </Box>
+          </Box>
+
+          <Divider sx={{ borderColor: "#E5E7EB" }} />
+
+          <Box
             sx={{
-              minHeight: 44,
-              px: 2,
-              borderRadius: "12px",
-              bgcolor: "#FF6B00",
-              fontSize: 13,
-              fontWeight: 800,
-              textTransform: "none",
-              boxShadow: "none",
-              "& .MuiButton-startIcon": {
-                marginRight: 0.75,
-              },
-              "& svg": {
-                fontSize: 18,
-              },
-              "&:hover": {
-                bgcolor: "#E55C00",
+              px: { xs: 2.5, md: 3.5 },
+              py: 2.25,
+              overflowY: "auto",
+              flex: 1,
+            }}
+          >
+            {loading ? (
+              <Box sx={{ display: "grid", placeItems: "center", minHeight: 360 }}>
+                <CircularProgress />
+              </Box>
+            ) : details ? (
+              <Box sx={{ display: "flex", flexDirection: "column", gap: 2.8 }}>
+                <Box>
+                  <SectionTitle>INCIDENT DETAILS</SectionTitle>
+
+                  <Box
+                    sx={{
+                      mt: 1.3,
+                      p: { xs: 1.8, md: 2.1 },
+                      borderRadius: 2.5,
+                      border: "1px solid #E5E7EB",
+                      bgcolor: "#FAFBFC",
+                    }}
+                  >
+                    <Box
+                      sx={{
+                        display: "grid",
+                        gridTemplateColumns: { xs: "1fr", md: "1fr 1fr" },
+                        columnGap: 5,
+                        rowGap: 2.1,
+                      }}
+                    >
+                      <DetailItem label="APPLICATION" value={resolvedService} />
+                      <DetailItem label="ENVIRONMENT" value={resolveEnvironment(incident)} />
+                      <DetailItem label="PRIORITY" value={resolvePriority(incident?.priority)} />
+                      <DetailItem label="STATUS" value={normalizeStatus(incident?.state)} />
+                      <DetailItem
+                        label="CREATED"
+                        value={formatDateTime(incident?.opened_at)}
+                      />
+                      <DetailItem
+                        label="INVESTIGATION STATUS"
+                        value={investigationStatus}
+                      />
+                    </Box>
+                  </Box>
+                </Box>
+
+                <Box>
+                  <SectionTitle>ISSUE</SectionTitle>
+                  <Typography
+                    sx={{
+                      mt: 0.9,
+                      fontSize: { xs: 17, md: 18 },
+                      lineHeight: 1.3,
+                      fontWeight: 500,
+                      color: "#1F2937",
+                    }}
+                  >
+                    {incident?.short_description ?? "-"}
+                  </Typography>
+                </Box>
+
+                <Box>
+                  <SectionTitle>DESCRIPTION</SectionTitle>
+                  <Typography
+                    sx={{
+                      mt: 0.9,
+                      fontSize: { xs: 14, md: 15 },
+                      lineHeight: 1.45,
+                      color: "#374151",
+                      whiteSpace: "pre-line",
+                    }}
+                  >
+                    {resolveDescription(details)}
+                  </Typography>
+                </Box>
+              </Box>
+            ) : (
+              <Typography sx={{ color: "#64748B" }}>No data available.</Typography>
+            )}
+          </Box>
+
+          <Divider sx={{ borderColor: "#E5E7EB" }} />
+
+          <Box
+            sx={{
+              px: { xs: 2, md: 3 },
+              py: 1.5,
+              display: "flex",
+              justifyContent: "flex-end",
+              gap: 2,
+              flexWrap: "wrap",
+              bgcolor: "#FFFFFF",
+            }}
+          >
+            <Button
+              variant="outlined"
+              disabled={restarting}
+              onClick={handleRestart}
+              startIcon={<ReplayRoundedIcon />}
+              sx={{
+                minHeight: 46,
+                px: 2.5,
+                borderRadius: "14px",
+                borderWidth: 1,
+                borderColor: "#D1D5DB",
+                color: "#111827",
+                fontSize: 15,
+                fontWeight: 700,
+                textTransform: "none",
+                bgcolor: "#FFFFFF",
+                "&:hover": {
+                  borderColor: "#9CA3AF",
+                  bgcolor: "#F9FAFB",
+                },
+              }}
+            >
+              {restarting ? "Restarting..." : "Restart Investigation"}
+            </Button>
+
+            <Button
+              variant="contained"
+              disabled={!investigation?.investigation_id}
+              onClick={() => {
+                if (!investigation?.investigation_id) return;
+                navigate(`/reports/${investigation.investigation_id}`);
+              }}
+              startIcon={<DescriptionOutlinedIcon />}
+              sx={{
+                minHeight: 46,
+                px: 2.75,
+                borderRadius: "14px",
+                bgcolor: "#F97316",
+                fontSize: 15,
+                fontWeight: 700,
+                textTransform: "none",
                 boxShadow: "none",
-              },
-              "&.Mui-disabled": {
-                bgcolor: "#F3A36D",
-                color: "#FFFFFF",
-              },
-            }}
-          >
-            Show Report
-          </Button>
+                "&:hover": {
+                  bgcolor: "#EA580C",
+                  boxShadow: "none",
+                },
+                "&.Mui-disabled": {
+                  bgcolor: "#FDBA74",
+                  color: "#FFFFFF",
+                },
+              }}
+            >
+              View Investigation Report
+            </Button>
+          </Box>
         </Box>
       </Box>
     </Dialog>
   );
 }
 
-function DetailItem({
-  label,
-  value,
-  badge = false,
-  badgeColor = "#F3F4F6",
-  badgeTextColor = "#1F2937",
-}: {
-  label: string;
-  value: string;
-  badge?: boolean;
-  badgeColor?: string;
-  badgeTextColor?: string;
-}) {
+function SectionTitle({ children }: { children: string }) {
+  return (
+    <Typography
+      sx={{
+        fontSize: 12,
+        fontWeight: 800,
+        letterSpacing: "0.04em",
+        color: "#6B7280",
+      }}
+    >
+      {children}
+    </Typography>
+  );
+}
+
+function DetailItem({ label, value }: { label: string; value: string }) {
   return (
     <Box>
       <Typography
         sx={{
-          fontSize: 13,
+          fontSize: 12,
           fontWeight: 700,
-          letterSpacing: "0.04em",
-          color: "#A0AAB8",
-          mb: 1,
+          letterSpacing: "0.05em",
+          color: "#6B7280",
+          mb: 0.3,
         }}
       >
         {label}
       </Typography>
-
-      {badge ? (
-        <Box
-          sx={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 1.2,
-            px: 2,
-            py: 0.85,
-            borderRadius: "999px",
-            bgcolor: badgeColor,
-            color: badgeTextColor,
-            fontSize: 15,
-            fontWeight: 800,
-            lineHeight: 1,
-          }}
-        >
-          <Box
-            sx={{
-              width: 12,
-              height: 12,
-              borderRadius: "50%",
-              bgcolor: badgeTextColor,
-              opacity: 0.92,
-            }}
-          />
-          {value}
-        </Box>
-      ) : (
-        <Typography
-          sx={{
-            fontSize: 18,
-            lineHeight: 1.3,
-            fontWeight: 800,
-            color: "#2A3444",
-            wordBreak: "break-word",
-          }}
-        >
-          {value}
-        </Typography>
-      )}
+      <Typography
+        sx={{
+          fontSize: 15,
+          lineHeight: 1.3,
+          fontWeight: 600,
+          color: "#111827",
+          wordBreak: "break-word",
+        }}
+      >
+        {value}
+      </Typography>
     </Box>
   );
 }
 
-function resolveServiceName(incident: any) {
+function StatusChip({
+  label,
+  dotColor,
+  bg,
+  text,
+}: {
+  label: string;
+  dotColor: string;
+  bg: string;
+  text: string;
+}) {
+  return (
+    <Box
+      sx={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 1,
+        px: 1.25,
+        py: 0.45,
+        borderRadius: "999px",
+        bgcolor: bg,
+        color: text,
+        border: "1px solid rgba(0,0,0,0.06)",
+        fontSize: 12.5,
+        fontWeight: 700,
+        lineHeight: 1,
+      }}
+    >
+      <Box
+        sx={{
+          width: 8,
+          height: 8,
+          borderRadius: "50%",
+          bgcolor: dotColor,
+        }}
+      />
+      {label}
+    </Box>
+  );
+}
+
+function resolveApplicationName(incident: any) {
   const candidates = [
-    incident?.service,
-    incident?.configuration_item,
-    incident?.caller,
-    incident?.assignment_group,
     incident?.application_name,
     incident?.app_name,
+    incident?.service,
     incident?.business_service,
+    incident?.configuration_item,
   ];
 
   const found = candidates.find(
     (value) => typeof value === "string" && value.trim().length > 0,
   );
 
-  if (found) return cleanServiceName(found);
+  if (found) return cleanValue(found);
 
   const description = incident?.short_description ?? "";
-  const match = description.match(/^([^-–—]+?)\s+service\b/i);
+  const summaryMatch = description.match(/^([^-–—]+?)\s+service\b/i);
 
-  if (match?.[1]) {
-    return cleanServiceName(`${match[1].trim()}-${resolveEnvironment(description)}`);
+  if (summaryMatch?.[1]) {
+    return cleanValue(summaryMatch[1]);
   }
 
-  const derived = incident?.short_description?.trim();
+  const firstWord = description.trim().split(/\s+/).slice(0, 2).join(" ");
 
-  if (derived) {
-    return cleanServiceName(derived.split(/\s+/).slice(0, 2).join(" "));
+  if (firstWord) {
+    return cleanValue(firstWord);
   }
 
   return "-";
 }
 
-function cleanServiceName(value: string) {
-  const trimmed = value.trim();
+function resolveEnvironment(incident: any) {
+  const text = [
+    incident?.environment,
+    incident?.short_description,
+    incident?.description,
+    incident?.service,
+  ]
+    .filter(Boolean)
+    .join(" ");
 
-  if (!trimmed) return "-";
-
-  const withoutSuffix = trimmed
-    .replace(/\s+service$/i, "")
-    .replace(/\s+service\s+down$/i, "")
-    .replace(/\s+service\s+error$/i, "")
-    .replace(/\s+service\s+issue$/i, "")
-    .trim();
-
-  return withoutSuffix || trimmed;
-}
-
-function resolveEnvironment(text: string) {
   const match = text.match(/\b(prod|production|qa|uat|stage|staging|dev|development|test)\b/i);
+  if (!match?.[1]) return "Production";
 
-  if (!match?.[1]) return "";
-
-  return match[1].toLowerCase();
+  const value = match[1].toLowerCase();
+  return value === "prod" ? "Production" : value.charAt(0).toUpperCase() + value.slice(1);
 }
 
 function resolvePriority(priority?: string | null) {
   if (!priority) return "-";
-
   const normalized = priority.toString().trim().toUpperCase();
-
   if (normalized.startsWith("P")) return normalized;
-
-  if (/^\d+$/.test(normalized)) {
-    return `P${normalized}`;
-  }
-
+  if (/^\d+$/.test(normalized)) return `P${normalized}`;
   return normalized;
+}
+
+function normalizeStatus(status?: string | null) {
+  if (!status) return "-";
+  const value = status.toString().replace(/_/g, " ").trim();
+  return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }
 
 function resolveInvestigationLabel(status?: string) {
   switch (status) {
     case "RUNNING":
-      return "Running";
+      return "In Progress";
     case "COMPLETED":
       return "Completed";
     case "FAILED":
       return "Failed";
-    case "RECEIVED":
-      return "Received";
     default:
-      return "-";
+      return "New";
   }
 }
 
-function investigationBadgeColor(status?: string) {
-  switch (status) {
-    case "COMPLETED":
-      return "#E4F4E6";
-    case "FAILED":
-      return "#FDE8E8";
-    case "RUNNING":
-    case "RECEIVED":
-      return "#E8EEF8";
-    default:
-      return "#F3F4F6";
-  }
+function resolveDescription(details: any) {
+  const candidates = [
+    details?.incident?.description,
+    details?.incident?.comments,
+    details?.incident?.work_notes,
+    details?.incident?.short_description,
+  ];
+
+  const found = candidates.find(
+    (value) => typeof value === "string" && value.trim().length > 0,
+  );
+
+  return found ? found.trim() : "-";
 }
 
-function investigationBadgeTextColor(status?: string) {
-  switch (status) {
-    case "COMPLETED":
-      return "#2E7D32";
-    case "FAILED":
-      return "#C62828";
-    case "RUNNING":
-    case "RECEIVED":
-      return "#1D4ED8";
-    default:
-      return "#64748B";
-  }
+function cleanValue(value: string) {
+  const cleaned = value.trim();
+  return cleaned.length > 0 ? cleaned : "-";
 }

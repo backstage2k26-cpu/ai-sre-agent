@@ -1,8 +1,14 @@
-from fastapi import APIRouter, HTTPException
-
 from app.schemas.start_investigation import StartInvestigationRequest
 from app.services.incident_service import IncidentService
 from app.services.investigation_manager import InvestigationManager
+import traceback
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
+from app.database.session import get_db
+from app.repositories.investigation_repository import InvestigationRepository
+from app.services.similar_incident_service import SimilarIncidentService
 
 router = APIRouter()
 
@@ -14,19 +20,22 @@ incident_service = IncidentService()
 
 @router.post("/investigations")
 async def investigate(request: StartInvestigationRequest):
-
     try:
         incident = await incident_service.fetch_by_number(
             request.incident_number
         )
 
-        request = ServiceNowMapper.to_investigation_request(payload)
+        investigation_request = ServiceNowMapper.from_incident(
+            incident
+        )
 
-        investigation = await manager.submit_incident(request)
+        investigation = await manager.submit_incident(
+            investigation_request
+        )
 
         return {
-            "investigation_id": investigation_id,
-            "status": "RUNNING",
+            "investigation_id": investigation.investigation_id,
+            "status": investigation.status,
         }
 
     except ValueError as ex:
@@ -36,6 +45,9 @@ async def investigate(request: StartInvestigationRequest):
         )
 
     except Exception as ex:
+        import traceback
+        traceback.print_exc()
+
         raise HTTPException(
             status_code=500,
             detail=str(ex),
@@ -116,3 +128,39 @@ async def delete_investigation(
     return {
         "message": "Investigation deleted"
     }
+
+@router.get(
+    "/investigations/{investigation_id}/similar-incidents"
+)
+async def get_similar_incidents(
+    investigation_id: str,
+    db: Session = Depends(get_db),
+):
+    try:
+        repository = InvestigationRepository(db)
+
+        service = SimilarIncidentService(
+            repository
+        )
+
+        incidents = await service.find_similar_incidents(
+            investigation_id=investigation_id,
+            limit=3,
+        )
+
+        return incidents
+
+    except ValueError as ex:
+        raise HTTPException(
+            status_code=404,
+            detail=str(ex),
+        )
+
+    except Exception as ex:
+        import traceback
+        traceback.print_exc()
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(ex),
+        )

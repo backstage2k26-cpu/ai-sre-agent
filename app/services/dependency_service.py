@@ -21,10 +21,18 @@ class DependencyService:
 
         namespace = context.namespace
 
-        deployment = self.deployments.get_deployment(
-            namespace,
-            context.application_name,
-        )
+        # Try the actual Kubernetes deployment name first
+        try:
+            deployment = self.deployments.get_deployment(
+                namespace,
+                context.namespace,
+            )
+        except Exception:
+            # Fallback to the normalized application name
+            deployment = self.deployments.get_deployment(
+                namespace,
+                context.application_name,
+            )
 
         dependency_names = set()
 

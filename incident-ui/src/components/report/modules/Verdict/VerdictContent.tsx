@@ -37,7 +37,8 @@ function InfoRow({ label, value }: InfoRowProps) {
               fontWeight: 600,
           }}
       >
-
+        {label}
+      </Typography>
       <Box textAlign="right">
         {value}
       </Box>

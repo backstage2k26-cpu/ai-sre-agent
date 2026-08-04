@@ -191,9 +191,6 @@ Reason:
 
 Summary:
 {match.summary}
-
-Recommendation:
-{match.recommendation}
 '''
 for match in summary.knowledge.matches
 )}
@@ -318,12 +315,4 @@ Confidence:
 Supporting Evidence:
 
 {chr(10).join(f"- {f}" for f in summary.correlation.findings)}
-
-## Recommended Actions
-
-- Review Gateway configuration.
-- Verify HTTPRoute.
-- Verify Service Endpoints.
-- Review application logs.
-- Validate Kubernetes events.
 """

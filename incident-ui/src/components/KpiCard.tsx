@@ -1,85 +1,56 @@
 import { Box, Typography } from "@mui/material";
-import ClipboardOutlinedIcon from "@mui/icons-material/ContentPasteOutlined";
-import CheckCircleOutlineOutlinedIcon from "@mui/icons-material/CheckCircleOutlineOutlined";
-import CancelOutlinedIcon from "@mui/icons-material/CancelOutlined";
-import FlagOutlinedIcon from "@mui/icons-material/FlagOutlined";
-import AccessTimeOutlinedIcon from "@mui/icons-material/AccessTimeOutlined";
-import InsightsOutlinedIcon from "@mui/icons-material/InsightsOutlined";
+import FavoriteBorderRoundedIcon from "@mui/icons-material/FavoriteBorderRounded";
+import ErrorOutlineRoundedIcon from "@mui/icons-material/ErrorOutlineRounded";
+import SearchRoundedIcon from "@mui/icons-material/SearchRounded";
+import CheckCircleOutlineRoundedIcon from "@mui/icons-material/CheckCircleOutlineRounded";
+import AccessTimeRoundedIcon from "@mui/icons-material/AccessTimeRounded";
+import PsychologyAltRoundedIcon from "@mui/icons-material/PsychologyAltRounded";
 
 interface Props {
   title: string;
   value: string | number;
-  tone?: "indigo" | "green" | "red" | "amber" | "violet" | "blue";
-  icon?: "clipboard" | "check" | "close" | "flag" | "clock" | "pulse";
+  icon?: "pulse" | "alert" | "search" | "check" | "clock" | "brain";
+  delta?: string;
+  deltaTone?: "green" | "red";
 }
 
-const toneStyles = {
-  indigo: {
-    bg: "#EEF2FF",
-    fg: "#4F46E5",
-    line: "#C7D2FE",
-  },
-  green: {
-    bg: "#ECFDF5",
-    fg: "#10B981",
-    line: "#BBF7D0",
-  },
-  red: {
-    bg: "#FEF2F2",
-    fg: "#F43F5E",
-    line: "#FECACA",
-  },
-  amber: {
-    bg: "#FFFBEB",
-    fg: "#F59E0B",
-    line: "#FDE68A",
-  },
-  violet: {
-    bg: "#F5F3FF",
-    fg: "#8B5CF6",
-    line: "#DDD6FE",
-  },
-  blue: {
-    bg: "#EFF6FF",
-    fg: "#0EA5E9",
-    line: "#BAE6FD",
-  },
-} as const;
+export default function KpiCard({
+  title,
+  value,
+  icon,
+  delta,
+  deltaTone = "green",
+}: Props) {
+  const trendColor = deltaTone === "red" ? "#ef4444" : "#16a34a";
+  const trendArrow = deltaTone === "red" ? "↘" : "↗";
 
-function pickIcon(icon?: Props["icon"], color?: string) {
-  const shared = { fontSize: "1.2rem" as const, sx: { color } };
-
-  switch (icon) {
-    case "check":
-      return <CheckCircleOutlineOutlinedIcon {...shared} />;
-    case "close":
-      return <CancelOutlinedIcon {...shared} />;
-    case "flag":
-      return <FlagOutlinedIcon {...shared} />;
-    case "clock":
-      return <AccessTimeOutlinedIcon {...shared} />;
-    case "pulse":
-      return <InsightsOutlinedIcon {...shared} />;
-    default:
-      return <ClipboardOutlinedIcon {...shared} />;
-  }
-}
-
-export default function KpiCard({ title, value, tone = "indigo", icon }: Props) {
-  const style = toneStyles[tone];
+  const Icon = (() => {
+    switch (icon) {
+      case "alert":
+        return ErrorOutlineRoundedIcon;
+      case "search":
+        return SearchRoundedIcon;
+      case "check":
+        return CheckCircleOutlineRoundedIcon;
+      case "clock":
+        return AccessTimeRoundedIcon;
+      case "brain":
+        return PsychologyAltRoundedIcon;
+      default:
+        return FavoriteBorderRoundedIcon;
+    }
+  })();
 
   return (
     <Box
       sx={{
-        width: "100%",
-        minWidth: 0,
-        minHeight: 172,
-        borderRadius: "20px",
-        background: "rgba(255,255,255,.96)",
-        border: "1px solid rgba(226,232,240,.9)",
-        boxShadow: "0 10px 22px rgba(15,23,42,.08)",
-        px: 2.25,
-        py: 2,
+        height: 104,
+        borderRadius: "14px",
+        bgcolor: "#fff",
+        border: "1px solid #E5E7EB",
+        boxShadow: "0 1px 6px rgba(15,23,42,.05)",
+        px: 1.8,
+        py: 1.45,
         display: "flex",
         flexDirection: "column",
         justifyContent: "space-between",
@@ -87,45 +58,87 @@ export default function KpiCard({ title, value, tone = "indigo", icon }: Props) 
     >
       <Box
         sx={{
-          width: 44,
-          height: 44,
-          borderRadius: "13px",
-          display: "grid",
-          placeItems: "center",
-          background: style.bg,
+          display: "flex",
+          alignItems: "flex-start",
+          justifyContent: "space-between",
+          gap: 1,
         }}
       >
-        {pickIcon(icon, style.fg)}
-      </Box>
-
-      <Box>
         <Typography
           sx={{
-            mt: 1,
-            fontSize: { xs: 24, md: 30 },
-            lineHeight: 1,
-            fontWeight: 800,
-            letterSpacing: "-0.04em",
-            color: "var(--text-strong)",
-          }}
-        >
-          {value}
-        </Typography>
-
-        <Typography
-          sx={{
-            mt: 0.45,
-            fontSize: 15,
-            lineHeight: 1.15,
-            fontWeight: 600,
-            color: "var(--text-soft)",
+            fontSize: 11,
+            fontWeight: 700,
+            color: "#6B7280",
+            textTransform: "uppercase",
+            letterSpacing: ".08em",
+            lineHeight: 1.2,
+            pr: 1,
           }}
         >
           {title}
         </Typography>
+
+        <Box
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            width: 18,
+            height: 18,
+            color:
+              icon === "alert"
+                ? "#ef4444"
+                : icon === "search"
+                  ? "#4b5563"
+                  : icon === "check"
+                    ? "#16a34a"
+                    : icon === "clock"
+                      ? "#16a34a"
+                      : icon === "brain"
+                        ? "#10b981"
+                        : "#4b5563",
+          }}
+        >
+          <Icon sx={{ fontSize: 16 }} />
+        </Box>
       </Box>
 
-      <Box sx={{ mt: 1, height: 3, borderRadius: 999, background: style.line }} />
+      <Typography
+        sx={{
+          fontSize: 22,
+          fontWeight: 800,
+          color: "#111827",
+          lineHeight: 1,
+          mt: 0.3,
+        }}
+      >
+        {value}
+      </Typography>
+
+      {delta && (
+        <Box
+          sx={{
+            display: "flex",
+            alignItems: "center",
+            gap: 0.35,
+            fontSize: 12,
+            fontWeight: 700,
+            color: trendColor,
+          }}
+        >
+          <span>{trendArrow}</span>
+          <span>{delta}</span>
+
+          <Typography
+            sx={{
+              fontSize: 12,
+              color: "#6B7280",
+            }}
+          >
+            vs last 7d
+          </Typography>
+        </Box>
+      )}
     </Box>
   );
 }

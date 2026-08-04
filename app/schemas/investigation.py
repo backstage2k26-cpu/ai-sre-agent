@@ -12,5 +12,6 @@ class InvestigationContext(BaseModel):
     search_window_minutes: int
     keywords: list[str]
     application_name: str
-    namespace: str
+    argocd_application: str
     deployment: DeploymentInfo | None = None
+    normalized_service: str

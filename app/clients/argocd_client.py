@@ -43,3 +43,21 @@ class ArgoCDClient:
             response.raise_for_status()
 
             return response.json()
+        
+    async def list_applications(self):
+
+        url = f"{self.base_url}/api/v1/applications"
+
+        async with httpx.AsyncClient(
+            verify=False,
+            timeout=self.timeout,
+        ) as client:
+
+            response = await client.get(
+                url,
+                headers=self.headers,
+            )
+
+            response.raise_for_status()
+
+            return response.json()["items"]

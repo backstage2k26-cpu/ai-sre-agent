@@ -438,3 +438,109 @@ class InvestigationRepository:
             .all()
         )
     
+    def count_completed_between(
+        self,
+        start: datetime,
+        end: datetime,
+    ) -> int:
+        return (
+            self.db.query(Investigation)
+            .filter(
+                Investigation.status == InvestigationStatus.COMPLETED,
+                Investigation.started_at >= start,
+                Investigation.started_at < end,
+            )
+            .count()
+        )
+    def count_failed_between(
+        self,
+        start: datetime,
+        end: datetime,
+    ) -> int:
+        return (
+            self.db.query(Investigation)
+            .filter(
+                Investigation.status == InvestigationStatus.FAILED,
+                Investigation.started_at >= start,
+                Investigation.started_at < end,
+            )
+            .count()
+        )
+    
+    def get_average_investigation_time_between(
+        self,
+        start: datetime,
+        end: datetime,
+    ) -> float:
+
+        completed = (
+            self.db.query(Investigation)
+            .filter(
+                Investigation.status == InvestigationStatus.COMPLETED,
+                Investigation.started_at >= start,
+                Investigation.started_at < end,
+            )
+            .all()
+        )
+
+        if not completed:
+            return 0.0
+
+        total_seconds = 0.0
+        counted = 0
+
+        for investigation in completed:
+            duration = self._extract_investigation_duration_seconds(
+                investigation
+            )
+
+            if duration is None:
+                continue
+
+            total_seconds += duration
+            counted += 1
+
+        if counted == 0:
+            return 0.0
+
+        return round(total_seconds / counted, 1)
+    
+    def get_average_confidence_between(
+        self,
+        start: datetime,
+        end: datetime,
+    ) -> float:
+
+        completed = (
+            self.db.query(Investigation)
+            .filter(
+                Investigation.status == InvestigationStatus.COMPLETED,
+                Investigation.report.isnot(None),
+                Investigation.started_at >= start,
+                Investigation.started_at < end,
+            )
+            .all()
+        )
+
+        if not completed:
+            return 0.0
+
+        total = 0.0
+        count = 0
+
+        for investigation in completed:
+
+            confidence = (
+                self._extract_investigation_confidence(
+                    investigation
+                )
+            )
+
+            if confidence is not None:
+                total += confidence
+                count += 1
+
+        if count == 0:
+            return 0.0
+
+        return round(total / count, 1)
