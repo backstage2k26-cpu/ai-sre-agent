@@ -156,7 +156,7 @@ pip install -r requirements.txt
 # Frontend Setup
 
 ```bash
-cd frontend
+cd incident-ui
 
 npm install
 ```
