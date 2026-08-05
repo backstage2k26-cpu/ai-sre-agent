@@ -25,12 +25,9 @@ import {
   Rocket,
   Boxes,
   Network,
-  BoxesIcon,
   Server,
   CalendarRange,
   Globe,
-  Shield,
-  Settings2,
   Workflow,
   Search,
   Activity,
@@ -311,7 +308,7 @@ function Hero({ data }: { data: AnyObj }) {
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 280px" }, gap: 1.75 }}>
         <Box>
           <Typography sx={{ ...eyebrowSx, fontSize: 10.5 }}>
-            AI INVESTIGATION REPORT · AI SRE AGENT V4.2.1
+            AI INVESTIGATION REPORT · {data.heroIncidentNumber || data.reportId || "INCIDENT"}
           </Typography>
           <Typography sx={{ mt: 0.55, fontSize: { xs: 23, md: 28 }, lineHeight: 1.02, fontWeight: 800, letterSpacing: "-0.05em" }}>
             {data.heroShortDescription || "Short description not available"}
@@ -332,7 +329,7 @@ function Hero({ data }: { data: AnyObj }) {
           <Typography sx={{ mt: 0.3, color: "rgba(255,255,255,0.92)", fontSize: { xs: 12.5, md: 13.5 }, lineHeight: 1.32 }}>
             {data.heroHow || "No dynamic data available"}
           </Typography>
-          <Divider sx={{ my: 1.3, borderColor: "rgba(255,255,255,0.12)" }} />
+          
           <Box
             sx={{
               mt: 1,
@@ -596,19 +593,12 @@ function AIInvestigationSection({ data }: { data: AnyObj }) {
 
 function TechnicalInvestigationSection({ data }: { data: AnyObj }) {
   const cards = buildTechnicalCards(data);
-  const counts = cards.reduce(
-    (acc, card) => {
-      acc[card.state as "Problem" | "Warning" | "Healthy"] += 1;
-      return acc;
-    },
-    { Problem: 0, Warning: 0, Healthy: 0 }
-  );
 
   return (
     <Box sx={{ mt: 2 }}>
       <Box sx={{ mt: 2.2, display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(4, 1fr)" }, gap: 1.25 }}>
         {cards.map((card, index) => (
-          <TechnicalCard key={index} title={card.title} summary={card.summary} state={card.state} icon={card.icon} />
+          <TechnicalCard key={index} title={card.title} summary={card.summary} detail={card.detail} state={card.state} icon={card.icon} />
         ))}
       </Box>
     </Box>
@@ -617,21 +607,80 @@ function TechnicalInvestigationSection({ data }: { data: AnyObj }) {
 
 function buildTechnicalCards(data: AnyObj) {
   return [
-    { title: data.logsTitle || "Logs", summary: data.logsSummary || "-", state: inferTechState(data.logsSummary, data.logsCount, "logs"), icon: <FileText size={18} /> },
-    { title: data.metricsTitle || "Metrics", summary: data.metricsSummary || "-", state: inferTechState(data.metricsSummary, data.metricsCount, "metrics"), icon: <BarChart3 size={18} /> },
-    { title: data.deploymentsTitle || "Deployments", summary: data.deploymentsSummary || "-", state: inferTechState(data.deploymentsSummary, data.deploymentsCount, "deployment"), icon: <Rocket size={18} /> },
-    { title: data.kubernetesTitle || "Kubernetes", summary: data.kubernetesSummary || "-", state: inferTechState(data.kubernetesSummary, data.kubernetesCount, "kubernetes"), icon: <Boxes size={18} /> },
-    { title: data.networkTitle || "Ingress / Gateway", summary: data.networkSummary || "-", state: inferTechState(data.networkSummary, data.networkCount, "network"), icon: <Network size={18} /> },
-    { title: "Pods", summary: data.kubernetesSummary || "Pod readiness checked", state: inferTechState(data.kubernetesSummary, data.kubernetesCount, "pods"), icon: <Server size={18} /> },
-    { title: "Services", summary: data.networkSummary || "Service endpoints checked", state: inferTechState(data.networkSummary, data.networkCount, "services"), icon: <Workflow size={18} /> },
-    { title: "Events", summary: data.failurePoint || "No major events", state: inferTechState(data.logsSummary, data.logsCount, "events"), icon: <CalendarRange size={18} /> },
-    { title: "DNS", summary: data.depsSummary || "Dependency path reviewed", state: inferTechState(data.depsSummary, data.depsCount, "dns"), icon: <Search size={18} /> },
-    { title: "Config", summary: data.deploymentsSummary || "Rollout checked", state: inferTechState(data.deploymentsSummary, data.deploymentsCount, "config"), icon: <Settings2 size={18} /> },
-    { title: "Dependencies", summary: data.depsSummary || "-", state: inferTechState(data.depsSummary, data.depsCount, "deps"), icon: <BoxesIcon size={18} /> },
-    { title: "Security", summary: data.knowledgeTitle || "No policy flags", state: inferTechState(data.knowledge?.found ? "healthy" : "warning", data.knowledge?.matches?.length || 0, "security"), icon: <Shield size={18} /> },
+    {
+      title: data.logsTitle || "Logs",
+      summary: data.logsSummary || "-",
+      detail: buildLogsDetail(data),
+      state: inferTechState(data.logsSummary, data.logsCount, "logs"),
+      icon: <FileText size={18} />,
+    },
+    {
+      title: "Resource Utilization",
+      summary: data.metricsSummary || "Resource usage checked",
+      detail: buildResourceUtilizationDetail(data),
+      state: inferTechState(data.metricsSummary, data.metricsCount, "metrics"),
+      icon: <Activity size={18} />,
+    },
+    {
+      title: data.metricsTitle || "Metrics",
+      summary: data.metricsSummary || "-",
+      detail: buildMetricsDetail(data),
+      state: inferTechState(data.metricsSummary, data.metricsCount, "metrics"),
+      icon: <BarChart3 size={18} />,
+    },
+    {
+      title: data.deploymentsTitle || "Deployments",
+      summary: data.deploymentsSummary || "-",
+      detail: buildDeploymentDetail(data),
+      state: inferTechState(data.deploymentsSummary, data.deploymentsCount, "deployment"),
+      icon: <Rocket size={18} />,
+    },
+    {
+      title: data.kubernetesTitle || "Kubernetes",
+      summary: data.kubernetesSummary || "-",
+      detail: buildKubernetesDetail(data),
+      state: inferTechState(data.kubernetesSummary, data.kubernetesCount, "kubernetes"),
+      icon: <Boxes size={18} />,
+    },
+    {
+      title: data.networkTitle || "Ingress / Gateway",
+      summary: data.networkSummary || "-",
+      detail: buildNetworkDetail(data),
+      state: inferTechState(data.networkSummary, data.networkCount, "network"),
+      icon: <Network size={18} />,
+    },
+    {
+      title: "Pods",
+      summary: data.kubernetesSummary || "Pod readiness checked",
+      detail: buildPodsDetail(data),
+      state: inferTechState(data.kubernetesSummary, data.kubernetesCount, "pods"),
+      icon: <Server size={18} />,
+    },
+    {
+      title: "Database",
+      summary: data.databaseImpact?.summary || data.database?.summary || "Database impact checked",
+      detail: buildDatabaseDetail(data),
+      state: inferTechState(data.databaseImpact?.status || data.database?.status || data.databaseImpact?.summary, 1, "database"),
+      icon: <Workflow size={18} />,
+    },
+    {
+      title: "Pub/Sub",
+      summary: data.depsSummary || "Messaging dependency checked",
+      detail: buildPubSubDetail(data),
+      state: inferTechState(data.depsSummary, data.depsCount, "pubsub"),
+      icon: <CalendarRange size={18} />,
+    },
+    {
+      title: "Redis",
+      summary: data.depsSummary || "Cache dependency checked",
+      detail: buildRedisDetail(data),
+      state: inferTechState(data.depsSummary, data.depsCount, "redis"),
+      icon: <Search size={18} />,
+    },
   ] as Array<{
     title: string;
     summary: string;
+    detail: string;
     state: "Problem" | "Warning" | "Healthy";
     icon: React.ReactNode;
   }>;
@@ -706,11 +755,13 @@ function StatusSummaryPill({
 function TechnicalCard({
   title,
   summary,
+  detail,
   state,
   icon,
 }: {
   title: string;
   summary: string;
+  detail: string;
   count?: number;
   state: "Problem" | "Warning" | "Healthy";
   icon: React.ReactNode;
@@ -752,8 +803,8 @@ function TechnicalCard({
         <Box sx={{ width: 8, height: 8, borderRadius: "50%", bgcolor: accent, mt: 0.35 }} />
       </Box>
 
-      <Typography sx={{ mt: 0.8, color: "#4B5563", fontSize: 11.75, lineHeight: 1.35, minHeight: 32 }}>
-        {summary}
+      <Typography sx={{ mt: 0.8, color: "#4B5563", fontSize: 11.75, lineHeight: 1.45, minHeight: 34 }}>
+        {detail || summary}
       </Typography>
 
       <Box
@@ -841,6 +892,274 @@ function buildDatabaseCard(data: AnyObj) {
     status,
     healthy,
   };
+}
+
+function buildMetricsDetail(data: AnyObj) {
+  const metrics = data.metricsRaw || {};
+  const cpu = describeCpuMetric(metrics.cpu);
+  const rate = describeRateMetric(metrics, data.metricsFindings, data.metricsSummary);
+  const latency = describeLatencyMetric(metrics, data.metricsFindings, data.metricsSummary);
+  return compactJoin([
+    cpu ? `CPU ${cpu}` : "",
+    rate ? rate : "",
+    latency ? `latency ${latency}` : "",
+  ]) || firstSentence([data.metricsFindings, data.metricsSummary]) || "Metrics reviewed.";
+}
+
+function buildResourceUtilizationDetail(data: AnyObj) {
+  const metrics = data.metricsRaw || {};
+  const cpu = describeCpuUtilization(metrics.cpu, data.metricsFindings, data.metricsSummary);
+  const memory = describeMemoryUtilization(metrics.memory, data.metricsFindings, data.metricsSummary);
+  const cpuStatus = utilizationStatus(cpu);
+  const memoryStatus = utilizationStatus(memory);
+
+  const cpuText = cpu != null ? `CPU ${cpu}% ${cpuStatus}` : "";
+  const memoryText = memory != null ? `memory ${memory}% ${memoryStatus}` : "";
+  const limitText = cpuStatus === "within limits" && memoryStatus === "within limits"
+    ? "well within limits"
+    : "check limits";
+
+  return compactJoin([
+    cpuText,
+    memoryText,
+    `utilization ${limitText}`,
+  ]) || "Resource utilization reviewed.";
+}
+
+function buildKubernetesDetail(data: AnyObj) {
+  const pods = Array.isArray(data.kubernetesPods) ? data.kubernetesPods : [];
+  const running = pods.filter((pod) => isPodRunning(pod)).length;
+  const total = pods.length;
+  const state = summarizePodState(pods, data.kubernetesSummary, data.kubernetesFindings);
+  const fallback = firstSentence([data.kubernetesFindings, data.kubernetesSummary]) || "Pods inspected.";
+  return compactJoin([
+    total ? `${running}/${total} pods running` : fallback,
+    state ? state : "",
+  ]) || fallback;
+}
+
+function buildDeploymentDetail(data: AnyObj) {
+  const history = Array.isArray(data.deploymentHistory) ? data.deploymentHistory : [];
+  const last = history[0];
+  const deployedAt = firstText([last?.deployed_at, data.deploymentRaw?.deployed_at]);
+  const revision = firstText([last?.revision, data.deploymentRaw?.revision]);
+  const app = firstText([data.deploymentRaw?.application, data.applicationName, data.heroApp]);
+  return compactJoin([
+    app ? `${app} deployed` : "",
+    revision ? `revision ${revision}` : "",
+    deployedAt ? `at ${formatRelativeDate(deployedAt)}` : "",
+  ]) || firstSentence([data.deploymentsFindings, data.deploymentsSummary]) || "Deployment history reviewed.";
+}
+
+function buildPodsDetail(data: AnyObj) {
+  const pods = Array.isArray(data.kubernetesPods) ? data.kubernetesPods : [];
+  const total = pods.length;
+  const readyPods = pods.filter((pod) => isPodReady(pod)).length;
+  const runningPods = pods.filter((pod) => isPodRunning(pod)).length;
+  const readiness = summarizeProbeStatus(pods, "readiness");
+  const liveness = summarizeProbeStatus(pods, "liveness");
+  const states = pods.map((pod) => compactText(pod.phase || pod.status || pod.state)).filter(Boolean);
+  const stateText = states.length ? Array.from(new Set(states)).slice(0, 2).join(", ") : "";
+  const podNames = pods.map((pod) => compactText(pod.name || pod.metadata?.name)).filter(Boolean);
+  const podText = podNames.length ? podNames.slice(0, 3).join(", ") : "";
+  const fallback = firstSentence([data.kubernetesFindings, data.kubernetesSummary]) || "Pod health reviewed.";
+  return compactJoin([
+    total ? `${total} pods discovered` : fallback,
+    total ? `${readyPods} ready, ${runningPods} running` : "",
+    stateText ? `state ${stateText}` : "",
+    liveness ? `liveness ${liveness}` : "",
+    readiness ? `readiness ${readiness}` : "",
+    podText ? `pods ${podText}` : "",
+  ]) || fallback;
+}
+
+function buildDatabaseDetail(data: AnyObj) {
+  const db = data.databaseImpact || data.database || {};
+  const name = firstText([db.database_name, db.name]) || "Database";
+  const status = firstText([db.status]) || "checked";
+  const metric = firstText([db.metric, db.summary]) || "";
+  return compactJoin([
+    name,
+    metric,
+    status,
+  ]) || "Database checked.";
+}
+
+function buildLogsDetail(data: AnyObj) {
+  const findings = Array.isArray(data.logsFindings) ? data.logsFindings : [];
+  const firstFinding = firstSentence(findings);
+  const summary = firstSentence([data.logsSummary]);
+  return compactJoin([firstFinding, summary]) || "Log stream inspected for errors and warnings.";
+}
+
+function buildNetworkDetail(data: AnyObj) {
+  const findings = Array.isArray(data.networkFindings) ? data.networkFindings : [];
+  const firstFinding = firstSentence(findings);
+  const summary = firstSentence([data.networkSummary]);
+  return compactJoin([firstFinding, summary]) || "Gateway and routing path checked for reachability.";
+}
+
+function buildPubSubDetail(data: AnyObj) {
+  const candidate = findDependencyByKeywords(data.dependencyItems, ["pubsub", "pub/sub", "pub-sub", "kafka", "rabbitmq", "topic", "subscription", "queue", "pub"]);
+  const name = firstText([candidate?.name, candidate?.kind]) || "Pub/Sub";
+  const message = firstText([candidate?.message, data.depsSummary, data.depsFindings]) || "Messaging dependency checked.";
+  return compactJoin([name, message]) || "Messaging dependency checked.";
+}
+
+function buildRedisDetail(data: AnyObj) {
+  const candidate = findDependencyByKeywords(data.dependencyItems, ["redis", "cache", "memory store"]);
+  const name = firstText([candidate?.name, candidate?.kind]) || "Redis";
+  const message = firstText([candidate?.message, data.depsSummary, data.depsFindings]) || "Cache dependency checked.";
+  return compactJoin([name, message]) || "Cache dependency checked.";
+}
+
+function describeCpuMetric(cpu: unknown) {
+  const obj = cpu && typeof cpu === "object" ? (cpu as AnyObj) : null;
+  const candidates = [
+    obj?.value,
+    obj?.current,
+    obj?.usage,
+    obj?.average,
+    obj?.max,
+    obj?.summary,
+    obj?.text,
+    cpu,
+  ];
+  const text = firstText(candidates);
+  if (!text) return "";
+  const match = text.match(/(\d+(?:\.\d+)?\s*(?:cores?|%|millicores?))/i);
+  return match?.[1] || text;
+}
+
+function describeRateMetric(metrics: AnyObj, findings: unknown, summary: unknown) {
+  const candidates = [
+    metrics.rate,
+    metrics.rps,
+    metrics.request_rate,
+    metrics.requests_per_sec,
+    metrics.throughput,
+    findings,
+    summary,
+  ];
+  const text = firstText(candidates);
+  if (!text) return "";
+  const match = text.match(/(\d+(?:\.\d+)?\s*(?:rps|req\/s|requests?\/s|rpm|qps))/i);
+  return match?.[1] ? `rate ${match[1]}` : text;
+}
+
+function describeLatencyMetric(metrics: AnyObj, findings: unknown, summary: unknown) {
+  const candidates = [
+    metrics.latency,
+    metrics.p99,
+    metrics.p95,
+    metrics.p90,
+    metrics.response_time,
+    findings,
+    summary,
+  ];
+  const text = firstText(candidates);
+  if (!text) return "";
+  const match = text.match(/(?:latency|p99|p95|p90)?[^0-9]*(\d+(?:\.\d+)?\s*(?:ms|s|sec|seconds?))/i);
+  return match?.[1] || text;
+}
+
+function describeCpuUtilization(cpu: unknown, findings: unknown, summary: unknown) {
+  const text = firstText([extractValue(cpu), findings, summary]);
+  const value = extractPercent(text);
+  return value;
+}
+
+function describeMemoryUtilization(memory: unknown, findings: unknown, summary: unknown) {
+  const text = firstText([extractValue(memory), findings, summary]);
+  const value = extractPercent(text);
+  return value;
+}
+
+function extractValue(value: unknown) {
+  if (value && typeof value === "object") {
+    const obj = value as AnyObj;
+    return obj.value ?? obj.current ?? obj.usage ?? obj.average ?? obj.max ?? obj.summary ?? obj.text ?? obj.utilization;
+  }
+  return value;
+}
+
+function extractPercent(text: unknown) {
+  const value = String(text || "");
+  const match = value.match(/(\d+(?:\.\d+)?)\s*%/);
+  if (match?.[1]) return Number(match[1]);
+
+  const numeric = value.match(/(\d+(?:\.\d+)?)/);
+  if (numeric?.[1] && /cpu|memory|utilization|usage|limit/i.test(value)) {
+    return Number(numeric[1]);
+  }
+
+  return null;
+}
+
+function utilizationStatus(value: number | null) {
+  if (value == null) return "within limits";
+  if (value < 70) return "within limits";
+  if (value < 90) return "near limit";
+  return "over limit";
+}
+
+function isPodRunning(pod: AnyObj) {
+  const phase = compactText(pod.phase || pod.status || pod.state).toLowerCase();
+  const ready = compactText(pod.ready || pod.ready_status || pod.readiness).toLowerCase();
+  return phase.includes("running") || ready === "true" || ready === "ready";
+}
+
+function isPodReady(pod: AnyObj) {
+  const phase = compactText(pod.phase || pod.status || pod.state).toLowerCase();
+  const ready = compactText(pod.ready || pod.ready_status || pod.readiness).toLowerCase();
+  return ready === "true" || ready === "ready" || phase.includes("running");
+}
+
+function summarizeProbeStatus(pods: AnyObj[], probe: "liveness" | "readiness") {
+  const values = pods
+    .map((pod) => compactText(pod?.[probe] || pod?.[`${probe}_probe`] || pod?.[`${probe}Probe`] || pod?.[`${probe}_status`]))
+    .filter(Boolean);
+  if (!values.length) return "";
+  const healthy = values.filter((value) => /pass|ok|healthy|true|ready/i.test(value)).length;
+  if (healthy === values.length) return "passing";
+  if (healthy === 0) return "failing";
+  return "mixed";
+}
+
+function summarizePodState(pods: AnyObj[], summary: unknown, findings: unknown) {
+  const total = pods.length;
+  const readyPods = pods.filter((pod) => isPodReady(pod)).length;
+  const runningPods = pods.filter((pod) => isPodRunning(pod)).length;
+  if (total > 0) {
+    return `${readyPods}/${total} ready, ${runningPods}/${total} running`;
+  }
+  return firstSentence([findings, summary]) || "";
+}
+
+function findDependencyByKeywords(items: AnyObj[], keywords: string[]) {
+  return (Array.isArray(items) ? items : []).find((item) => {
+    const text = `${item?.name || ""} ${item?.kind || ""} ${item?.message || ""}`.toLowerCase();
+    return keywords.some((keyword) => text.includes(keyword.toLowerCase()));
+  }) || null;
+}
+
+function compactJoin(items: unknown[]) {
+  return items
+    .map((item) => String(item || "").replace(/\s+/g, " ").trim())
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function formatRelativeDate(value: string) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(date);
 }
 
 function buildInfrastructureTiles(data: AnyObj) {
@@ -1905,6 +2224,26 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
     report?.kubernetes_resources ??
     latestAi?.kubernetes_resources ??
     {};
+  const deploymentHistory = Array.isArray(job?.deployment?.history)
+    ? job.deployment.history
+    : Array.isArray(report?.deployment?.history)
+      ? report.deployment.history
+      : [];
+  const dependencyItems = Array.isArray(job?.dependency?.dependencies)
+    ? job.dependency.dependencies
+    : Array.isArray(report?.dependency?.dependencies)
+      ? report.dependency.dependencies
+      : [];
+  const kubernetesPods = Array.isArray(job?.kubernetes?.pods)
+    ? job.kubernetes.pods
+    : Array.isArray(report?.kubernetes?.pods)
+      ? report.kubernetes.pods
+      : [];
+  const kubernetesEvents = Array.isArray(job?.kubernetes?.events)
+    ? job.kubernetes.events
+    : Array.isArray(report?.kubernetes?.events)
+      ? report.kubernetes.events
+      : [];
   console.log(
     "REPORT HERO",
     JSON.stringify(report?.hero, null, 2)
@@ -1932,7 +2271,14 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
       incident?.location ??
       job?.context?.location ??
       "",
-    heroGeneratedAt: report?.hero?.generated_at ?? latestAi?.footer?.generated_at ?? formatDate(job?.started_at),
+    heroGeneratedAt: formatDate(
+      report?.footer?.generated_at ??
+      job?.completed_at ??
+      report?.hero?.generated_at ??
+      latestAi?.footer?.generated_at ??
+      job?.started_at
+    ),
+    heroIncidentNumber: incidentNumber,
     heroComponents: isFailed ? report?.hero?.components ?? latestAi?.hero?.components ?? "-" : report?.hero?.components ?? "14 inspected",
     heroEta: formatEta(
       report?.hero?.eta ??
@@ -1977,16 +2323,22 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
     metricsSummary: tech.metrics?.summary ?? "-",
     metricsCount: tech.metrics?.findings?.length ?? 0,
     metricsFindings: extractStrings(tech.metrics?.findings),
+    metricsRaw: job?.metrics ?? report?.metrics ?? null,
 
     deploymentsTitle: tech.deployment?.title ?? "Deployment",
     deploymentsSummary: tech.deployment?.summary ?? "-",
     deploymentsCount: tech.deployment?.findings?.length ?? 0,
     deploymentsFindings: extractStrings(tech.deployment?.findings),
+    deploymentHistory,
+    deploymentRaw: job?.deployment ?? report?.deployment ?? null,
 
     kubernetesTitle: tech.kubernetes?.title ?? "Kubernetes",
     kubernetesSummary: tech.kubernetes?.summary ?? "-",
     kubernetesCount: tech.kubernetes?.findings?.length ?? 0,
     kubernetesFindings: extractStrings(tech.kubernetes?.findings),
+    kubernetesPods,
+    kubernetesEvents,
+    kubernetesRaw: job?.kubernetes ?? report?.kubernetes ?? null,
 
     networkTitle: tech.network?.title ?? "Network",
     networkSummary: tech.network?.summary ?? "-",
@@ -1997,6 +2349,9 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
     depsSummary: tech.dependency?.summary ?? "-",
     depsCount: tech.dependency?.findings?.length ?? 0,
     depsFindings: extractStrings(tech.dependency?.findings),
+    dependencyItems,
+    databaseImpact: report?.database ?? job?.database ?? null,
+    dependencyRaw: job?.dependency ?? report?.dependency ?? null,
 
     applicationName,
     environment,
@@ -3680,15 +4035,17 @@ function formatDate(value?: string) {
   if (!value) return "-";
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return "-";
-  return new Intl.DateTimeFormat("en-US", {
+  return `${date.toLocaleDateString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    day: "2-digit",
     month: "short",
-    day: "numeric",
     year: "numeric",
-    hour: "numeric",
+  })}, ${date.toLocaleTimeString("en-IN", {
+    timeZone: "Asia/Kolkata",
+    hour: "2-digit",
     minute: "2-digit",
     hour12: true,
-    timeZoneName: "short",
-  }).format(date);
+  })} IST`;
 }
 
 function formatEta(value?: string | null) {

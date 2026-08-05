@@ -10,79 +10,122 @@ class KubernetesAnalyzer:
     ) -> KubernetesAssessment:
 
         findings = []
-
         severity = "LOW"
-
         confidence = 0.95
-
         summary = "Pods are healthy."
 
         #
-        # Pod Analysis
+        # Current Pod Analysis
+        # Current state is authoritative.
         #
+
+        unhealthy_pods = False
+        restart_warning = False
 
         for pod in pods:
 
-            if pod.get("phase") != "Running":
+            pod_name = pod.get("name", "unknown")
 
-                severity = "HIGH"
-
-                summary = "One or more pods are not running."
-
-                findings.append(
-                    f'Pod {pod["name"]} is {pod["phase"]}.'
-                )
-
-            if not pod["ready"]:
-
-                severity = "HIGH"
-
-                summary = "One or more pods are not Ready."
-
-                findings.append(
-                    f'Pod {pod["name"]} is not Ready.'
-                )
-
-            if pod["restart_count"] > 5:
-
-                if severity != "HIGH":
-                    severity = "MEDIUM"
-
-                summary = "Pods have restarted multiple times."
-
-                findings.append(
-                    f'Pod {pod["name"]} restarted '
-                    f'{pod["restart_count"]} times.'
-                )
+            phase = pod.get("phase")
+            ready = pod.get("ready", False)
+            restart_count = pod.get("restart_count", 0)
             waiting_reason = pod.get("waiting_reason")
 
+            # Highest priority: current crash loop
             if waiting_reason == "CrashLoopBackOff":
 
                 severity = "CRITICAL"
-
                 summary = "Application is crash looping."
+                unhealthy_pods = True
 
                 findings.append(
-                    f'Pod {pod["name"]} is in CrashLoopBackOff.'
+                    f"Pod {pod_name} is currently in CrashLoopBackOff."
+                )
+
+                continue
+
+            # Pod currently not running
+            if phase != "Running":
+
+                if severity != "CRITICAL":
+                    severity = "HIGH"
+
+                summary = "One or more pods are not running."
+                unhealthy_pods = True
+
+                findings.append(
+                    f"Pod {pod_name} is currently {phase}."
+                )
+
+            # Pod currently not ready
+            if not ready:
+
+                if severity != "CRITICAL":
+                    severity = "HIGH"
+
+                summary = "One or more pods are not Ready."
+                unhealthy_pods = True
+
+                findings.append(
+                    f"Pod {pod_name} is currently not Ready."
+                )
+
+            # Restarts are supporting evidence only.
+            # A currently healthy pod should not automatically
+            # become unhealthy because it restarted in the past.
+            if restart_count > 5:
+
+                restart_warning = True
+
+                findings.append(
+                    f"Pod {pod_name} has restarted "
+                    f"{restart_count} times historically."
                 )
 
         #
-        # Event Analysis
+        # No pods returned
         #
-        critical_reasons = {
-            "FailedScheduling",
-            "FailedMount",
-            "ImagePullBackOff",
-            "ErrImagePull",
-            "CrashLoopBackOff",
-            "OOMKilled",
-        }
 
-        high_reasons = {
-            "BackOff",
-            "Unhealthy",
-            "Failed",
-        }
+        if not pods:
+
+            severity = "MEDIUM"
+            confidence = 0.60
+            summary = "No application pods were found."
+
+            findings.append(
+                "No pods were returned for the investigated workload."
+            )
+
+        #
+        # Current pods are healthy
+        #
+
+        elif not unhealthy_pods:
+
+            severity = "LOW"
+            summary = "Pods are currently healthy."
+
+            findings.insert(
+                0,
+                "All current pods are Running and Ready."
+            )
+
+            if restart_warning:
+                findings.append(
+                    "Historical restarts were detected, "
+                    "but the pods are currently healthy."
+                )
+            else:
+                findings.append(
+                    "No significant pod restart activity detected."
+                )
+
+        #
+        # Kubernetes Events
+        #
+        # Events are supporting evidence.
+        # They must NOT override healthy current pod state.
+        #
 
         warning_events = [
             event
@@ -92,59 +135,57 @@ class KubernetesAnalyzer:
 
         if warning_events:
 
+            relevant_reasons = {
+                "FailedScheduling",
+                "FailedMount",
+                "ImagePullBackOff",
+                "ErrImagePull",
+                "CrashLoopBackOff",
+                "OOMKilled",
+                "BackOff",
+                "Unhealthy",
+                "Failed",
+            }
+
             for event in warning_events:
 
                 reason = event.get("reason", "")
                 message = event.get("message", "")
 
-                findings.append(f"{reason}: {message}")
+                if reason in relevant_reasons:
 
-                if reason in critical_reasons:
+                    findings.append(
+                        f"Historical Kubernetes event: "
+                        f"{reason}: {message}"
+                    )
 
-                    severity = "CRITICAL"
-                    summary = f"Kubernetes detected {reason}."
+            #
+            # Important:
+            # Events only strengthen an already detected
+            # current pod problem.
+            #
 
-                elif (
-                    reason in high_reasons
-                    and severity != "CRITICAL"
+            if unhealthy_pods:
+
+                critical_reasons = {
+                    "FailedScheduling",
+                    "FailedMount",
+                    "ImagePullBackOff",
+                    "ErrImagePull",
+                    "CrashLoopBackOff",
+                    "OOMKilled",
+                }
+
+                if any(
+                    event.get("reason") in critical_reasons
+                    for event in warning_events
                 ):
-
-                    severity = "HIGH"
-                    summary = f"Kubernetes detected {reason}."
-
-            if severity == "LOW":
-
-                severity = "MEDIUM"
-                summary = "Kubernetes warning events detected."
+                    severity = "CRITICAL"
 
         else:
 
             findings.append(
                 "No Kubernetes warning events detected."
-            )
-
-        #
-        # Healthy Cluster
-        #
-
-        if (
-            severity == "LOW"
-            and summary == "Pods are healthy."
-        ):
-
-            findings.insert(
-                0,
-                "All pods are Running.",
-            )
-
-            findings.insert(
-                1,
-                "All containers are Ready.",
-            )
-
-            findings.insert(
-                2,
-                "No restarts detected.",
             )
 
         return KubernetesAssessment(

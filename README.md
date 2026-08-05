@@ -257,6 +257,34 @@ http://localhost:5173
 
 ---
 
+some package installations
+
+# 1. Creating the missing user in your running Postgres container
+docker exec postgres psql -U postgres -c "CREATE USER agent WITH PASSWORD 'agent123';"
+
+# 2. Creating the missing database and assigning ownership
+docker exec postgres psql -U postgres -c "CREATE DATABASE incident_agent OWNER agent;"
+
+# 3. Running the Alembic migrations using your virtual environment
+./venv/bin/alembic upgrade head
+
+# 4. Installing the missing 'sentence-transformers' and adding to requirements.txt
+./venv/bin/pip install sentence-transformers
+echo "sentence-transformers" >> requirements.txt
+
+# 5. Installing the missing 'google-genai' and adding to requirements.txt
+./venv/bin/pip install google-genai
+echo "google-genai" >> requirements.txt
+
+# 6. Installing the missing 'kubernetes' and adding to requirements.txt
+./venv/bin/pip install kubernetes
+echo "kubernetes" >> requirements.txt
+
+# 7. Installing the missing 'qdrant-client' and adding to requirements.txt
+./venv/bin/pip install qdrant-client
+echo "qdrant-client" >> requirements.txt
+ 
+
 # Verify Integrations
 
 Before using the application, verify:
