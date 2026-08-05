@@ -726,7 +726,7 @@ export default function Incidents() {
               borderTop: "1px solid #EDF2F7",
             }}
           >
-            <Typography sx={{ color: "#B2BED1", fontWeight: 400, fontSize: 14.5 }}>
+            <Typography sx={{ color: "#B2BED1", fontWeight: 400, fontSize: 13.5 }}>
               Showing {filteredIncidents.length} of {incidents.length} incidents
             </Typography>
 

@@ -546,6 +546,38 @@ class InvestigationService:
                     "findings": summary.database_impact.evidence if summary.database_impact else [],
                 },
             },
+            "kubernetes": {
+                "pods": summary.kubernetes.pods,
+                "events": summary.kubernetes.events,
+                "assessment": {
+                    "summary": summary.kubernetes.assessment.summary,
+                    "findings": getattr(summary.kubernetes.assessment, "findings", []),
+                },
+            },
+            "deployment": {
+                "application": summary.deployment.application,
+                "namespace": summary.deployment.namespace,
+                "health_status": summary.deployment.health_status,
+                "sync_status": summary.deployment.sync_status,
+                "revision": summary.deployment.revision,
+                "image_tag": summary.deployment.image_tag,
+                "deployed_at": summary.deployment.deployed_at,
+                "deployed_by": summary.deployment.deployed_by,
+                "automated_sync": summary.deployment.automated_sync,
+                "recent_deployment": summary.deployment.recent_deployment,
+                "operation_phase": summary.deployment.operation_phase,
+                "operation_message": summary.deployment.operation_message,
+                "history": [
+                    {
+                        "id": item.id,
+                        "revision": item.revision,
+                        "deployed_at": item.deployed_at,
+                        "deployed_by": item.deployed_by,
+                        "automated": item.automated,
+                    }
+                    for item in summary.deployment.history
+                ],
+            },
             "database": {
                 "name": summary.database_impact.database_name if summary.database_impact else summary.context.application_name,
                 "type": summary.database_impact.database_type if summary.database_impact else "Database",
@@ -675,9 +707,13 @@ class InvestigationService:
         print("Incident number:", incident.number)
 
         try:
-            await self.snow_update.update(
+            work_notes = self.snow_update.format_work_notes(
                 incident.number,
                 summary.report,
+            )
+            await self.snow_update.update(
+                incident.number,
+                work_notes,
             )
         except Exception as e:
             print("\n========== SERVICENOW UPDATE ==========")
