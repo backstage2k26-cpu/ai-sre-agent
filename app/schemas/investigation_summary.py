@@ -17,6 +17,8 @@ from app.schemas.impact_summary import ImpactSummary
 from app.schemas.ai_investigation_result import AIInvestigationResult
 from app.schemas.log_summary import LogSummary
 from app.schemas.database_impact import DatabaseImpact
+from app.schemas.pubsub_assessment import PubSubAssessment
+from app.schemas.planner_result import PlannerResult
 
 
 class InvestigationSummary(BaseModel):
@@ -40,3 +42,5 @@ class InvestigationSummary(BaseModel):
     ai_result: AIInvestigationResult | None = None
     log_summary: LogSummary | None = None
     database_impact: DatabaseImpact | None = None
+    pubsub: PubSubAssessment | None = None
+    planner: PlannerResult | None = None

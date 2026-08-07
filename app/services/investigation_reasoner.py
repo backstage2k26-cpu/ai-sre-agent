@@ -32,6 +32,55 @@ class InvestigationReasoner:
                 }
             )
         log_summary = summary.log_summary
+        pubsub = getattr(summary, "pubsub", None)
+
+        if pubsub and pubsub.status != "SKIPPED":
+            pubsub_section = f"""
+        Pub/Sub
+
+        Dependency Discovered:
+        Yes
+
+        Status:
+        {pubsub.status}
+
+        Severity:
+        {pubsub.severity}
+
+        Confidence:
+        {pubsub.confidence}
+
+        Topic:
+        {pubsub.topic}
+
+        Subscription:
+        {pubsub.subscription}
+
+        Backlog:
+        {pubsub.backlog}
+
+        Oldest Unacknowledged Message:
+        {pubsub.oldest_unacked_age_seconds} seconds
+
+        Assessment:
+        {pubsub.summary}
+
+        Findings:
+        {chr(10).join(pubsub.findings)}
+        """
+        else:
+            pubsub_section = """
+        Pub/Sub
+
+        Dependency Discovered:
+        No
+
+        Status:
+        SKIPPED
+
+        Assessment:
+        No Pub/Sub dependency was discovered for this application.
+        """
         user_prompt = f"""
 Investigation Context
 
@@ -139,6 +188,8 @@ Dependencies
 Assessment:
 {summary.dependency.assessment}
 
+{pubsub_section}
+
 
 Correlation
 
@@ -149,7 +200,7 @@ Confidence:
 {summary.correlation.confidence}
 
 Findings:
-{summary.correlation.findings}
+{chr(10).join(summary.correlation.findings)}
 
 
 Evidence Score

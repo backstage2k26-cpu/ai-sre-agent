@@ -20,6 +20,7 @@ class Settings(BaseSettings):
 
     gcp_project: str
     gcp_location: str
+    gcp_project_id: str
 
     llm_provider: str
 

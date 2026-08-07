@@ -20,6 +20,31 @@ class LogAnalyzer:
         errors = []
         exceptions = []
 
+        # -----------------------------------------------------
+        # No logs available
+        #
+        # IMPORTANT:
+        # 0 logs does NOT mean healthy.
+        # It means there is insufficient log evidence.
+        # -----------------------------------------------------
+
+        if summary.total_logs == 0:
+
+            summary.likely_failure = (
+                "UNKNOWN - No log evidence available"
+            )
+
+            summary.first_error = None
+            summary.last_error = None
+            summary.top_errors = []
+            summary.top_exceptions = []
+
+            return summary
+
+        # -----------------------------------------------------
+        # Analyze collected logs
+        # -----------------------------------------------------
+
         for line in logs.entries:
 
             text = line.lower()
@@ -43,22 +68,67 @@ class LogAnalyzer:
             if "imagepullbackoff" in text:
                 summary.imagepull_count += 1
 
+        # -----------------------------------------------------
+        # Error details
+        # -----------------------------------------------------
+
         if errors:
+
             summary.first_error = errors[0]
             summary.last_error = errors[-1]
             summary.top_errors = errors[:5]
 
+        # -----------------------------------------------------
+        # Exception details
+        # -----------------------------------------------------
+
         if exceptions:
+
             summary.top_exceptions = exceptions[:5]
 
-        failures = Counter({
-            "CrashLoopBackOff": summary.crashloop_count,
-            "OOMKilled": summary.oom_count,
-            "Timeout": summary.timeout_count,
-            "ImagePullBackOff": summary.imagepull_count,
-        })
+        # -----------------------------------------------------
+        # Detect common failure patterns
+        # -----------------------------------------------------
 
-        if failures and failures.most_common(1)[0][1] > 0:
-            summary.likely_failure = failures.most_common(1)[0][0]
+        failures = Counter(
+            {
+                "CrashLoopBackOff": (
+                    summary.crashloop_count
+                ),
+
+                "OOMKilled": (
+                    summary.oom_count
+                ),
+
+                "Timeout": (
+                    summary.timeout_count
+                ),
+
+                "ImagePullBackOff": (
+                    summary.imagepull_count
+                ),
+            }
+        )
+
+        if (
+            failures
+            and failures.most_common(1)[0][1] > 0
+        ):
+
+            summary.likely_failure = (
+                failures.most_common(1)[0][0]
+            )
+
+        # -----------------------------------------------------
+        # Logs exist but no known failure pattern detected
+        # -----------------------------------------------------
+
+        elif (
+            summary.error_count == 0
+            and summary.warning_count == 0
+            and summary.exception_count == 0
+        ):
+
+            summary.likely_failure = None
 
         return summary

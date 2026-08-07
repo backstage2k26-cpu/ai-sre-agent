@@ -534,15 +534,49 @@ function resolveEnvironment(incident: any) {
 
 function resolvePriority(priority?: string | null) {
   if (!priority) return "-";
+
   const normalized = priority.toString().trim().toUpperCase();
-  if (normalized.startsWith("P")) return normalized;
-  if (/^\d+$/.test(normalized)) return `P${normalized}`;
-  return normalized;
+
+  const priorityMap: Record<string, string> = {
+    "1": "Critical",
+    "P1": "Critical",
+
+    "2": "High",
+    "P2": "High",
+
+    "3": "Medium",
+    "P3": "Medium",
+
+    "4": "Low",
+    "P4": "Low",
+
+    "5": "Planning",
+    "P5": "Planning",
+  };
+
+  return priorityMap[normalized] ?? normalized;
 }
 
 function normalizeStatus(status?: string | null) {
   if (!status) return "-";
-  const value = status.toString().replace(/_/g, " ").trim();
+
+  const normalized = status.toString().trim();
+
+  const statusMap: Record<string, string> = {
+    "1": "New",
+    "2": "In Progress",
+    "3": "On Hold",
+    "6": "Resolved",
+    "7": "Closed",
+    "8": "Canceled",
+  };
+
+  if (statusMap[normalized]) {
+    return statusMap[normalized];
+  }
+
+  const value = normalized.replace(/_/g, " ");
+
   return value.charAt(0).toUpperCase() + value.slice(1).toLowerCase();
 }
 
