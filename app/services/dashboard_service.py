@@ -34,20 +34,16 @@ class DashboardService:
         current_end = now
         previous_end = current_start
 
-        total_incidents = await self.client.count_total_incidents()
+        total_incidents = self.incident_repo.count_all()
 
-        current_window_incidents = (
-            await self.client.count_incidents_between(
-                current_start,
-                now,
-            )
+        current_window_incidents = self.incident_repo.count_between(
+            current_start,
+            now,
         )
 
-        previous_window_incidents = (
-            await self.client.count_incidents_between(
-                previous_start,
-                current_start,
-            )
+        previous_window_incidents = self.incident_repo.count_between(
+            previous_start,
+            current_start,
         )
 
         current_high = self.incident_repo.count_high_priority_between(

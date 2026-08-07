@@ -273,11 +273,12 @@ export default function Dashboard() {
   const loadDashboard = async () => {
     setRefreshing(true);
     try {
-      const [dashboardData, incidents] = await Promise.all([
+      const [dashboardData, incidents, trend] = await Promise.all([
         getDashboard(),
         getRecentIncidents(),
+        getIncidentTrend(),
       ]);
-      const trend = await getIncidentTrend();
+
       setTrendData(trend);
       console.log(trend);
 
@@ -287,9 +288,6 @@ export default function Dashboard() {
     } catch (error) {
       console.error("Failed to load dashboard:", error);
     } finally {
-      getServiceNowStatus()
-        .then((status) => setServiceNowOnline(status.online))
-        .catch(() => setServiceNowOnline(false));
       setLoading(false);
       setRefreshing(false);
     }
@@ -297,28 +295,30 @@ export default function Dashboard() {
 
   useEffect(() => {
     loadDashboard();
+
+    getServiceNowStatus()
+      .then((status) => setServiceNowOnline(status.online))
+      .catch(() => setServiceNowOnline(false));
   }, []);
 
   useEffect(() => {
-    const timer = window.setInterval(() => {
+      const timer = window.setInterval(() => {
+          setUpdatedAt(formatClockLabel(new Date()));
+      }, 30000);
+
+      const serviceNowTimer = window.setInterval(() => {
+          getServiceNowStatus()
+              .then((status) => setServiceNowOnline(status.online))
+              .catch(() => setServiceNowOnline(false));
+      }, 60000);
+
       setUpdatedAt(formatClockLabel(new Date()));
-    }, 30_000);
 
-    const serviceNowTimer = window.setInterval(() => {
-      getServiceNowStatus()
-        .then((status) => setServiceNowOnline(status.online))
-        .catch(() => setServiceNowOnline(false));
-    }, 60_000);
-
-    if (!updatedAt) {
-      setUpdatedAt(formatClockLabel(new Date()));
-    }
-
-    return () => {
-      window.clearInterval(timer);
-      window.clearInterval(serviceNowTimer);
-    };
-  }, [updatedAt]);
+      return () => {
+          window.clearInterval(timer);
+          window.clearInterval(serviceNowTimer);
+      };
+  }, []);
 
   const kpis = useMemo(() => {
     const totalIncidents = dashboard?.total_incidents?.value ?? recentIncidents.length;

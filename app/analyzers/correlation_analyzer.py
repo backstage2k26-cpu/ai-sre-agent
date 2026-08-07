@@ -20,8 +20,18 @@ class CorrelationAnalyzer:
             and summary.deployment.sync_status == "Synced"
         )
 
+        total_logs = len(summary.logs.entries)
+
+        logs_available = total_logs > 0
+
+        logs_problem = (
+            logs_available
+            and summary.logs.error_count > 0
+        )
+
         logs_ok = (
-            summary.logs.error_count == 0
+            logs_available
+            and summary.logs.error_count == 0
         )
 
         pods_ok = (
@@ -38,8 +48,31 @@ class CorrelationAnalyzer:
             and summary.network.endpoint_ok
         )
 
-        dependency_ok = (
-            getattr(summary.dependency, "healthy", True)
+        dependency_ok = getattr(
+            summary.dependency,
+            "healthy",
+            True,
+        )
+
+        # ----------------------------------------------------
+        # Pub/Sub
+        # ----------------------------------------------------
+
+        pubsub = getattr(summary, "pubsub", None)
+
+        pubsub_exists = (
+            pubsub is not None
+            and getattr(pubsub, "status", "SKIPPED") != "SKIPPED"
+        )
+
+        pubsub_problem = (
+            pubsub_exists
+            and getattr(pubsub, "status", "") == "PROBLEM"
+        )
+
+        pubsub_warning = (
+            pubsub_exists
+            and getattr(pubsub, "status", "") == "WARNING"
         )
 
         # ----------------------------------------------------
@@ -57,7 +90,8 @@ class CorrelationAnalyzer:
 
             return CorrelationResult(
                 probable_root_cause=(
-                    "Deployment rollout or ArgoCD synchronization failure."
+                    "Deployment rollout or ArgoCD "
+                    "synchronization failure."
                 ),
                 confidence="High",
                 findings=findings,
@@ -78,7 +112,8 @@ class CorrelationAnalyzer:
 
             return CorrelationResult(
                 probable_root_cause=(
-                    "Pods are unhealthy. Possible scheduling or runtime failure."
+                    "Pods are unhealthy. Possible scheduling "
+                    "or runtime failure."
                 ),
                 confidence="High",
                 findings=findings,
@@ -88,13 +123,21 @@ class CorrelationAnalyzer:
         # Logs
         # ----------------------------------------------------
 
-        if not logs_ok:
+        if logs_problem:
+
+            log_finding = (
+                "No application errors detected in collected logs."
+                if logs_ok
+                else "Application log evidence was unavailable."
+            )
 
             findings.extend(
                 [
                     "Deployment is healthy.",
-                    "Pods are running.",
-                    f"{summary.logs.error_count} application errors detected.",
+                    "Pods are healthy.",
+                    log_finding,
+                    "Resource utilization is normal.",
+                    "Network connectivity verified.",
                 ]
             )
 
@@ -104,6 +147,13 @@ class CorrelationAnalyzer:
                 ),
                 confidence="High",
                 findings=findings,
+            )
+
+        if not logs_available:
+
+            findings.append(
+                "No application log evidence was available "
+                "during the investigation window."
             )
 
         # ----------------------------------------------------
@@ -137,14 +187,15 @@ class CorrelationAnalyzer:
             findings.extend(
                 [
                     "Deployment is healthy.",
-                    "Application is healthy.",
+                    "Application workload is healthy.",
                     "Network connectivity validation failed.",
                 ]
             )
 
             return CorrelationResult(
                 probable_root_cause=(
-                    "Gateway, HTTPRoute or Service connectivity issue."
+                    "Gateway, HTTPRoute or Service "
+                    "connectivity issue."
                 ),
                 confidence="High",
                 findings=findings,
@@ -158,7 +209,7 @@ class CorrelationAnalyzer:
 
             findings.extend(
                 [
-                    "Infrastructure is healthy.",
+                    "Core infrastructure is healthy.",
                     "Dependent service appears unavailable.",
                 ]
             )
@@ -172,7 +223,96 @@ class CorrelationAnalyzer:
             )
 
         # ----------------------------------------------------
-        # Healthy Infrastructure
+        # Pub/Sub Problem
+        #
+        # PubSubAnalyzer has already correlated:
+        #
+        # backlog
+        # message age
+        # ACK activity
+        # delivery activity
+        # backlog trend
+        # DLQ
+        # expired ACKs
+        #
+        # CorrelationAnalyzer should therefore consume that
+        # assessment rather than duplicating all Pub/Sub rules.
+        # ----------------------------------------------------
+
+        if pubsub_problem:
+
+            findings.extend(
+                [
+                    "Deployment is healthy.",
+                    "Pods are healthy.",
+                    "Resource utilization is normal.",
+                    "Network connectivity is healthy.",
+                ]
+            )
+
+            # Include all evidence generated by PubSubAnalyzer.
+
+            for finding in getattr(
+                pubsub,
+                "findings",
+                [],
+            ):
+                findings.append(
+                    f"Pub/Sub: {finding}"
+                )
+
+            return CorrelationResult(
+                probable_root_cause=(
+                    pubsub.summary
+                    or
+                    "Pub/Sub message processing failure detected."
+                ),
+                confidence="High",
+                findings=findings,
+            )
+
+        # ----------------------------------------------------
+        # Pub/Sub Warning
+        # ----------------------------------------------------
+
+        if pubsub_warning:
+
+            findings.extend(
+                [
+                    "Deployment is healthy.",
+                    "Pods are healthy.",
+                    "No application errors detected.",
+                    "Resource utilization is normal.",
+                    "Network connectivity is healthy.",
+                ]
+            )
+
+            for finding in getattr(
+                pubsub,
+                "findings",
+                [],
+            ):
+                findings.append(
+                    f"Pub/Sub: {finding}"
+                )
+
+            findings.append(
+                "Pub/Sub degradation exists, but current "
+                "evidence is not strong enough to establish "
+                "Pub/Sub as the confirmed root cause."
+            )
+
+            return CorrelationResult(
+                probable_root_cause=(
+                    "Pub/Sub message processing degradation "
+                    "requires further investigation."
+                ),
+                confidence="Medium",
+                findings=findings,
+            )
+
+        # ----------------------------------------------------
+        # Healthy Infrastructure / Unresolved
         # ----------------------------------------------------
 
         findings.extend(
@@ -185,10 +325,47 @@ class CorrelationAnalyzer:
             ]
         )
 
+        # ----------------------------------------------------
+        # Pub/Sub healthy
+        # ----------------------------------------------------
+
+        if pubsub_exists:
+
+            findings.append(
+                "Pub/Sub dependency was discovered and "
+                "no significant Pub/Sub processing problem "
+                "was detected."
+            )
+
+            for finding in getattr(
+                pubsub,
+                "findings",
+                [],
+            ):
+                findings.append(
+                    f"Pub/Sub: {finding}"
+                )
+
+        # ----------------------------------------------------
+        # Pub/Sub not used
+        # ----------------------------------------------------
+
+        else:
+
+            findings.append(
+                "No Pub/Sub dependency was discovered "
+                "for this application."
+            )
+
+        # ----------------------------------------------------
+        # Unknown Root Cause
+        # ----------------------------------------------------
+
         return CorrelationResult(
             probable_root_cause=(
-                "Infrastructure appears healthy. The incident is likely caused by an external dependency, client request issue, or business logic outside the platform."
+                "Infrastructure appears healthy. Current evidence "
+                "is insufficient to determine the root cause."
             ),
-            confidence="Medium",
+            confidence="Low",
             findings=findings,
         )

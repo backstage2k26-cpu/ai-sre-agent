@@ -245,7 +245,7 @@ export default function InvestigationReport() {
               step="03"
               tag="COMPONENT-BY-COMPONENT"
               title="Technical Investigation"
-              subtitle="14 subsystems inspected in parallel. Click any card to drill into evidence."
+              subtitle="subsystems inspected in parallel. Click any card to drill into evidence."
             />
 
             <TechnicalInvestigationSection data={data} />
@@ -256,11 +256,8 @@ export default function InvestigationReport() {
 
         {!isFailed && (
           <>
-            <SectionHeader step="04" tag="SYSTEM TOPOLOGY" title="Infrastructure Health Map" subtitle="11 of 12 systems investigated. Skipped systems were healthy at query time." />
-            <InfrastructureSection data={data} />
-
             <SectionHeader
-              step="05"
+              step="04"
               tag="CHRONOLOGY"
               title="Investigation Timeline"
               subtitle="Trace the incident from the first known issue through investigation, root cause and recovery planning."
@@ -268,7 +265,7 @@ export default function InvestigationReport() {
             <TimelineSection data={data} />
 
             <SectionHeader
-              step="06"
+              step="05"
               tag="FIX NOW"
               title="Recovery Actions"
               subtitle="Prioritized, runnable steps to restore service."
@@ -276,7 +273,7 @@ export default function InvestigationReport() {
             <RecoveryActionsSection data={data} />
 
             <SectionHeader
-              step="07"
+              step="06"
               tag="PATTERN INTELLIGENCE"
               title="Similar Incidents"
               subtitle="Historical incidents with matching signatures, ranked by similarity."
@@ -303,6 +300,7 @@ function TopBar({ navigate }: { navigate: (path: string) => void }) {
 }
 
 function Hero({ data }: { data: AnyObj }) {
+  const inspectedComponents = buildTechnicalCards(data).length;
   return (
     <Paper sx={{ p: { xs: 1.75, md: 2.1 }, borderRadius: 4, background: "linear-gradient(135deg, #1F3358 0%, #344a72 100%)", color: "#fff", boxShadow: "0 18px 42px rgba(15,23,42,0.18)" }}>
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 280px" }, gap: 1.75 }}>
@@ -363,7 +361,7 @@ function Hero({ data }: { data: AnyObj }) {
         <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.1 }}>
           <HeroStat label="CONFIDENCE" value={data.heroConfidence == null ? "-" : `${data.heroConfidence}%`} />
           <HeroStat label="INVESTIGATION" value={data.heroDuration || "-"} />
-          <HeroStat label="COMPONENTS" value={data.heroComponents} />
+          <HeroStat label="COMPONENTS" value={inspectedComponents} />
           <HeroStat label="ETA" value={data.heroEta} />
         </Box>
       </Box>
@@ -605,83 +603,238 @@ function TechnicalInvestigationSection({ data }: { data: AnyObj }) {
   );
 }
 
+type TechState = "Problem" | "Warning" | "Healthy" | "Unknown";
+
+function mapBackendTechState(
+  status: unknown,
+  fallbackSummary?: unknown,
+  fallbackCount = 0,
+  kind = ""
+): TechState {
+  const normalized = compactText(status).toUpperCase();
+
+  if (
+    normalized === "PROBLEM" ||
+    normalized === "FAILED" ||
+    normalized === "ERROR" ||
+    normalized === "UNHEALTHY" ||
+    normalized === "CRITICAL"
+  ) {
+    return "Problem";
+  }
+
+  if (
+    normalized === "WARNING" ||
+    normalized === "DEGRADED" ||
+    normalized === "PARTIAL"
+  ) {
+    return "Warning";
+  }
+
+  if (
+    normalized === "HEALTHY" ||
+    normalized === "SUCCESS" ||
+    normalized === "OK" ||
+    normalized === "PASS"
+  ) {
+    return "Healthy";
+  }
+
+  if (
+    normalized === "UNKNOWN" ||
+    normalized === "NO_DATA" ||
+    normalized === "NOT_COLLECTED"
+  ) {
+    return "Unknown";
+  }
+
+  // Backward compatibility for old reports without structured status
+  return inferTechState(
+    fallbackSummary,
+    fallbackCount,
+    kind
+  );
+}
+
+function shouldShowTechnicalCard(status: unknown, discovered = true) {
+  const normalized = compactText(status).toUpperCase();
+
+  if (
+    normalized === "SKIPPED" ||
+    normalized === "NOT_APPLICABLE" ||
+    normalized === "NOT_DISCOVERED"
+  ) {
+    return false;
+  }
+
+  return discovered;
+}
+
 function buildTechnicalCards(data: AnyObj) {
-  return [
+  const cards = [
     {
+      show: true,
       title: data.logsTitle || "Logs",
       summary: data.logsSummary || "-",
       detail: buildLogsDetail(data),
-      state: inferTechState(data.logsSummary, data.logsCount, "logs"),
+      state: mapBackendTechState(
+        data.logsStatus,
+        data.logsSummary,
+        data.logsCount,
+        "logs"
+      ),
       icon: <FileText size={18} />,
     },
+
     {
+      show: true,
       title: "Resource Utilization",
       summary: data.metricsSummary || "Resource usage checked",
       detail: buildResourceUtilizationDetail(data),
-      state: inferTechState(data.metricsSummary, data.metricsCount, "metrics"),
+      state: mapBackendTechState(
+        data.metricsStatus,
+        data.metricsSummary,
+        data.metricsCount,
+        "metrics"
+      ),
       icon: <Activity size={18} />,
     },
+
     {
+      show: true,
       title: data.metricsTitle || "Metrics",
       summary: data.metricsSummary || "-",
       detail: buildMetricsDetail(data),
-      state: inferTechState(data.metricsSummary, data.metricsCount, "metrics"),
+      state: mapBackendTechState(
+        data.metricsStatus,
+        data.metricsSummary,
+        data.metricsCount,
+        "metrics"
+      ),
       icon: <BarChart3 size={18} />,
     },
+
     {
+      show: true,
       title: data.deploymentsTitle || "Deployments",
       summary: data.deploymentsSummary || "-",
       detail: buildDeploymentDetail(data),
-      state: inferTechState(data.deploymentsSummary, data.deploymentsCount, "deployment"),
+      state: mapBackendTechState(
+        data.deploymentsStatus,
+        data.deploymentsSummary,
+        data.deploymentsCount,
+        "deployment"
+      ),
       icon: <Rocket size={18} />,
     },
+
     {
+      show: true,
       title: data.kubernetesTitle || "Kubernetes",
       summary: data.kubernetesSummary || "-",
       detail: buildKubernetesDetail(data),
-      state: inferTechState(data.kubernetesSummary, data.kubernetesCount, "kubernetes"),
+      state: mapBackendTechState(
+        data.kubernetesStatus,
+        data.kubernetesSummary,
+        data.kubernetesCount,
+        "kubernetes"
+      ),
       icon: <Boxes size={18} />,
     },
+
     {
+      show: true,
       title: data.networkTitle || "Ingress / Gateway",
       summary: data.networkSummary || "-",
       detail: buildNetworkDetail(data),
-      state: inferTechState(data.networkSummary, data.networkCount, "network"),
+      state: mapBackendTechState(
+        data.networkStatus,
+        data.networkSummary,
+        data.networkCount,
+        "network"
+      ),
       icon: <Network size={18} />,
     },
+
     {
+      show: true,
       title: "Pods",
       summary: data.kubernetesSummary || "Pod readiness checked",
       detail: buildPodsDetail(data),
-      state: inferTechState(data.kubernetesSummary, data.kubernetesCount, "pods"),
+      state: mapBackendTechState(
+        data.podsStatus || data.kubernetesStatus,
+        data.kubernetesSummary,
+        data.kubernetesCount,
+        "pods"
+      ),
       icon: <Server size={18} />,
     },
+
     {
+      show: shouldShowTechnicalCard(
+        data.databaseStatus,
+        Boolean(data.databaseImpact || data.database)
+      ),
       title: "Database",
-      summary: data.databaseImpact?.summary || data.database?.summary || "Database impact checked",
+      summary:
+        data.databaseImpact?.summary ||
+        data.database?.summary ||
+        "Database impact checked",
       detail: buildDatabaseDetail(data),
-      state: inferTechState(data.databaseImpact?.status || data.database?.status || data.databaseImpact?.summary, 1, "database"),
+      state: mapBackendTechState(
+        data.databaseStatus,
+        data.databaseImpact?.summary || data.database?.summary,
+        0,
+        "database"
+      ),
       icon: <Workflow size={18} />,
     },
+
     {
-      title: "Pub/Sub",
-      summary: data.depsSummary || "Messaging dependency checked",
+      show: shouldShowTechnicalCard(
+        data.pubsubStatus,
+        Boolean(data.pubsubRaw)
+      ),
+      title: data.pubsubTitle || "Pub/Sub",
+      summary: data.pubsubSummary || "-",
       detail: buildPubSubDetail(data),
-      state: inferTechState(data.depsSummary, data.depsCount, "pubsub"),
+      state: mapBackendTechState(
+        data.pubsubStatus,
+        data.pubsubSummary,
+        data.pubsubCount,
+        "pubsub"
+      ),
       icon: <CalendarRange size={18} />,
     },
+
     {
+      show: shouldShowTechnicalCard(
+        data.redisStatus,
+        Boolean(
+          findDependencyByKeywords(
+            data.dependencyItems,
+            ["redis", "cache", "memory store"]
+          )
+        )
+      ),
       title: "Redis",
       summary: data.depsSummary || "Cache dependency checked",
       detail: buildRedisDetail(data),
-      state: inferTechState(data.depsSummary, data.depsCount, "redis"),
+      state: mapBackendTechState(
+        data.redisStatus,
+        data.depsSummary,
+        data.depsCount,
+        "redis"
+      ),
       icon: <Search size={18} />,
     },
-  ] as Array<{
+  ];
+
+  return cards.filter((card) => card.show) as Array<{
     title: string;
     summary: string;
     detail: string;
-    state: "Problem" | "Warning" | "Healthy";
+    state: TechState;
     icon: React.ReactNode;
   }>;
 }
@@ -763,13 +916,26 @@ function TechnicalCard({
   summary: string;
   detail: string;
   count?: number;
-  state: "Problem" | "Warning" | "Healthy";
+  state: TechState;
   icon: React.ReactNode;
 }) {
   const accent =
-    state === "Problem" ? "#EF4444" : state === "Warning" ? "#EAB308" : "#16A34A";
+    state === "Problem"
+      ? "#EF4444"
+      : state === "Warning"
+        ? "#EAB308"
+        : state === "Healthy"
+          ? "#16A34A"
+          : "#94A3B8";
+
   const softBg =
-    state === "Problem" ? "#FFF5F5" : state === "Warning" ? "#FFFBEB" : "#F0FDF4";
+    state === "Problem"
+      ? "#FFF5F5"
+      : state === "Warning"
+        ? "#FFFBEB"
+        : state === "Healthy"
+          ? "#F0FDF4"
+          : "#F8FAFC";
 
   return (
     <Paper
@@ -820,78 +986,6 @@ function TechnicalCard({
       </Box>
     </Paper>
   );
-}
-
-function InfrastructureSection({ data }: { data: AnyObj }) {
-  const tiles = buildInfrastructureTiles(data);
-  const databaseCard = buildDatabaseCard(data);
-
-  return (
-    <Paper sx={{ mt: 2, p: 1.5, borderRadius: 4 }}>
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "repeat(4, 1fr)" }, gap: 1.2 }}>
-        <DatabaseCard
-          name={databaseCard.name}
-          type={databaseCard.type}
-          metric={databaseCard.metric}
-          score={databaseCard.score}
-          status={databaseCard.status}
-          healthy={databaseCard.healthy}
-        />
-
-        {tiles.map((item: AnyObj, index: number) => (
-          <TopologyTile
-            key={index}
-            name={item.name}
-            type={item.type}
-            metric={item.metric}
-            score={item.score}
-            status={item.status}
-            tone={item.tone}
-          />
-        ))}
-      </Box>
-    </Paper>
-  );
-}
-
-function buildDatabaseCard(data: AnyObj) {
-  const name = compactText(
-    data.dbName ||
-    data.dbTitle ||
-    data.databaseName ||
-    data.applicationName ||
-    "Database",
-  );
-  const type = compactText(data.dbType || "Database");
-  const metric = compactText(
-    data.dbMetric ||
-    data.dbLatency ||
-    data.dbSummary ||
-    "",
-  );
-  const score = compactText(
-    data.dbScore ||
-    data.dbAvailability ||
-    data.dbHealth ||
-    "",
-  );
-  const status = executionLabel(
-    data.dbStatus,
-    metric,
-    score,
-  );
-  const healthy = !/skip|fail|error|problem|degrad/i.test(
-    `${data.dbStatus || ""} ${metric || ""} ${score || ""}`,
-  );
-
-  return {
-    name,
-    type,
-    metric,
-    score,
-    status,
-    healthy,
-  };
 }
 
 function buildMetricsDetail(data: AnyObj) {
@@ -947,7 +1041,7 @@ function buildDeploymentDetail(data: AnyObj) {
   return compactJoin([
     app ? `${app} deployed` : "",
     revision ? `revision ${revision}` : "",
-    deployedAt ? `at ${formatRelativeDate(deployedAt)}` : "",
+    deployedAt ? `at ${formatDate(deployedAt)}` : "",
   ]) || firstSentence([data.deploymentsFindings, data.deploymentsSummary]) || "Deployment history reviewed.";
 }
 
@@ -1000,10 +1094,32 @@ function buildNetworkDetail(data: AnyObj) {
 }
 
 function buildPubSubDetail(data: AnyObj) {
-  const candidate = findDependencyByKeywords(data.dependencyItems, ["pubsub", "pub/sub", "pub-sub", "kafka", "rabbitmq", "topic", "subscription", "queue", "pub"]);
-  const name = firstText([candidate?.name, candidate?.kind]) || "Pub/Sub";
-  const message = firstText([candidate?.message, data.depsSummary, data.depsFindings]) || "Messaging dependency checked.";
-  return compactJoin([name, message]) || "Messaging dependency checked.";
+  const pubsub = data.pubsubRaw || {};
+
+  const findings = Array.isArray(data.pubsubFindings)
+    ? data.pubsubFindings
+    : [];
+
+  const firstFinding = firstSentence(findings);
+
+  const topic = firstText([
+    pubsub.topic,
+    pubsub.topic_name,
+  ]);
+
+  const subscription = firstText([
+    pubsub.subscription,
+    pubsub.subscription_name,
+  ]);
+
+  return (
+    compactJoin([
+      topic ? `Topic ${topic}` : "",
+      subscription ? `Subscription ${subscription}` : "",
+      firstFinding,
+      data.pubsubSummary,
+    ]) || "Pub/Sub investigation completed."
+  );
 }
 
 function buildRedisDetail(data: AnyObj) {
@@ -1148,184 +1264,6 @@ function compactJoin(items: unknown[]) {
     .map((item) => String(item || "").replace(/\s+/g, " ").trim())
     .filter(Boolean)
     .join(" · ");
-}
-
-function formatRelativeDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat("en-US", {
-    month: "short",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    hour12: false,
-  }).format(date);
-}
-
-function buildInfrastructureTiles(data: AnyObj) {
-  if (Array.isArray(data.infrastructure) && data.infrastructure.length) {
-    return data.infrastructure
-      .map((item: AnyObj | unknown[]) => {
-        if (Array.isArray(item)) {
-          const [name, type, metric, score, status, tone] = item;
-          return {
-            name: compactText(name),
-            type: compactText(type),
-            metric: compactText(metric),
-            score: compactText(score),
-            status: executionLabel(status, metric, score),
-            tone: inferInfrastructureTone(String(tone || status || metric || score || "")),
-          };
-        }
-
-        if (item && typeof item === "object") {
-          const row = item as AnyObj;
-          return {
-            name: compactText(row.name),
-            type: compactText(row.type),
-            metric: compactText(row.metric || row.summary || row.description),
-            score: compactText(row.score || row.latency || row.availability),
-            status: executionLabel(row.status, row.metric, row.score),
-            tone: inferInfrastructureTone(String(row.tone || row.status || row.metric || row.score || "")),
-          };
-        }
-
-        return null;
-      })
-      .filter((item): item is {
-        name: string;
-        type: string;
-        metric: string;
-        score: string;
-        status: string;
-        tone: "healthy" | "warning" | "problem";
-      } => item !== null);
-  }
-
-  const serviceNowSummary = compactText(data.servicenowMetric || data.servicenowStatus || "ITSM");
-  const grafanaSummary = compactText(data.grafanaMetric || data.grafanaStatus || data.logsSummary || "Observability");
-  const lokiSummary = compactText(data.lokiMetric || data.lokiStatus || data.logsSummary || "Logs");
-  const prometheusSummary = compactText(data.prometheusMetric || data.prometheusStatus || data.metricsSummary || "Metrics");
-  const k8sSummary = compactText(data.k8sApiMetric || data.k8sApiStatus || data.kubernetesSummary || "Orchestration");
-  const argocdSummary = compactText(data.argocdMetric || data.argocdStatus || data.deploymentsSummary || "GitOps");
-  const appSummary = compactText(data.applicationMetric || data.applicationStatus || data.executiveRootCause || "Application");
-  const gatewaySummary = compactText(data.ingressGatewayMetric || data.ingressGatewayScore || data.networkSummary || "Network");
-  const paymentsSummary = compactText(data.paymentsMetric || data.paymentsScore || data.depsSummary || "Dependency");
-  const authSummary = compactText(data.authMetric || data.authScore || data.depsSummary || "Dependency");
-  const s3Summary = compactText(data.s3Metric || data.s3Score || data.depsSummary || "Storage");
-
-  return [
-    {
-      name: data.servicenowName || "ServiceNow",
-      type: "ITSM",
-      metric: serviceNowSummary,
-      score: compactText(data.servicenowScore || ""),
-      status: executionLabel(data.servicenowStatus, serviceNowSummary, data.servicenowScore),
-      tone: inferInfrastructureTone(String(data.servicenowStatus || serviceNowSummary || data.servicenowScore || "")),
-    },
-    {
-      name: data.grafanaName || "Grafana",
-      type: "Observability",
-      metric: grafanaSummary,
-      score: compactText(data.grafanaScore || ""),
-      status: executionLabel(data.grafanaStatus, grafanaSummary, data.grafanaScore),
-      tone: inferInfrastructureTone(String(data.grafanaStatus || grafanaSummary || data.grafanaScore || "")),
-    },
-    {
-      name: data.lokiName || "Loki",
-      type: "Logs",
-      metric: lokiSummary,
-      score: compactText(data.lokiScore || ""),
-      status: executionLabel(data.lokiStatus, lokiSummary, data.lokiScore),
-      tone: inferInfrastructureTone(String(data.lokiStatus || lokiSummary || data.lokiScore || "")),
-    },
-    {
-      name: data.prometheusName || "Prometheus",
-      type: "Metrics",
-      metric: prometheusSummary,
-      score: compactText(data.prometheusScore || ""),
-      status: executionLabel(data.prometheusStatus, prometheusSummary, data.prometheusScore),
-      tone: inferInfrastructureTone(String(data.prometheusStatus || prometheusSummary || data.prometheusScore || "")),
-    },
-    {
-      name: data.k8sApiName || "Kubernetes API",
-      type: "Orchestration",
-      metric: k8sSummary,
-      score: compactText(data.k8sApiScore || ""),
-      status: executionLabel(data.k8sApiStatus, k8sSummary, data.k8sApiScore),
-      tone: inferInfrastructureTone(String(data.k8sApiStatus || k8sSummary || data.k8sApiScore || "")),
-    },
-    {
-      name: data.argocdName || "ArgoCD",
-      type: "GitOps",
-      metric: argocdSummary,
-      score: compactText(data.argocdScore || ""),
-      status: executionLabel(data.argocdStatus, argocdSummary, data.argocdScore),
-      tone: inferInfrastructureTone(String(data.argocdStatus || argocdSummary || data.argocdScore || "")),
-    },
-    {
-      name: data.applicationName || "Application",
-      type: "Application",
-      metric: appSummary,
-      score: compactText(data.applicationScore || ""),
-      status: executionLabel(data.applicationStatus, appSummary, data.applicationScore),
-      tone: inferInfrastructureTone(String(data.applicationStatus || appSummary || data.applicationScore || "")),
-    },
-    {
-      name: data.ingressGatewayName || "Ingress Gateway",
-      type: "Network",
-      metric: gatewaySummary,
-      score: compactText(data.ingressGatewayScore || ""),
-      status: executionLabel(data.ingressGatewayStatus, gatewaySummary, data.ingressGatewayScore),
-      tone: inferInfrastructureTone(String(data.ingressGatewayStatus || gatewaySummary || data.ingressGatewayScore || "")),
-    },
-    {
-      name: data.paymentsApiName || "payments-api",
-      type: "Dependency",
-      metric: paymentsSummary,
-      score: compactText(data.paymentsScore || ""),
-      status: executionLabel(data.paymentsStatus, paymentsSummary, data.paymentsScore),
-      tone: inferInfrastructureTone(String(data.paymentsStatus || paymentsSummary || data.paymentsScore || "")),
-    },
-    {
-      name: data.authSvcName || "auth-svc",
-      type: "Dependency",
-      metric: authSummary,
-      score: compactText(data.authScore || ""),
-      status: executionLabel(data.authStatus, authSummary, data.authScore),
-      tone: inferInfrastructureTone(String(data.authStatus || authSummary || data.authScore || "")),
-    },
-    {
-      name: data.s3Name || "S3 assets-eu",
-      type: "Storage",
-      metric: s3Summary,
-      score: compactText(data.s3Score || ""),
-      status: executionLabel(data.s3Status, s3Summary, data.s3Score),
-      tone: inferInfrastructureTone(String(data.s3Status || s3Summary || data.s3Score || "")),
-    },
-  ];
-}
-
-function executionLabel(status: unknown, metric: unknown, score: unknown) {
-  const statusText = compactText(status);
-  if (statusText) {
-    return /skip/i.test(statusText) ? "Skipped" : "Investigated";
-  }
-
-  const text = `${metric ?? ""} ${score ?? ""}`.toLowerCase();
-  if (!text.trim()) return "Skipped";
-  return "Investigated";
-}
-
-function inferInfrastructureTone(text: string): "healthy" | "warning" | "problem" {
-  const lower = text.toLowerCase();
-  if (lower.includes("failed") || lower.includes("error") || lower.includes("problem") || lower.includes("0%") || lower.includes("0/0")) {
-    return "problem";
-  }
-  if (lower.includes("warning") || lower.includes("degraded") || lower.includes("partial") || lower.includes("62%")) {
-    return "warning";
-  }
-  return "healthy";
 }
 
 function compactText(value: unknown) {
@@ -2279,7 +2217,10 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
       job?.started_at
     ),
     heroIncidentNumber: incidentNumber,
-    heroComponents: isFailed ? report?.hero?.components ?? latestAi?.hero?.components ?? "-" : report?.hero?.components ?? "14 inspected",
+    heroComponents:
+      report?.hero?.components ??
+      latestAi?.hero?.components ??
+      "-",
     heroEta: formatEta(
       report?.hero?.eta ??
       latestAi?.hero?.eta ??
@@ -2315,17 +2256,20 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
     failureTitle,
 
     logsTitle: tech.logs?.title ?? "Logs",
+    logsStatus: tech.logs?.status ?? null,
     logsSummary: tech.logs?.summary ?? "-",
     logsCount: tech.logs?.findings?.length ?? 0,
     logsFindings: extractStrings(tech.logs?.findings),
 
     metricsTitle: tech.metrics?.title ?? "Metrics",
+    metricsStatus: tech.metrics?.status ?? null,
     metricsSummary: tech.metrics?.summary ?? "-",
     metricsCount: tech.metrics?.findings?.length ?? 0,
     metricsFindings: extractStrings(tech.metrics?.findings),
     metricsRaw: job?.metrics ?? report?.metrics ?? null,
 
     deploymentsTitle: tech.deployment?.title ?? "Deployment",
+    deploymentsStatus: tech.deployment?.status ?? null,
     deploymentsSummary: tech.deployment?.summary ?? "-",
     deploymentsCount: tech.deployment?.findings?.length ?? 0,
     deploymentsFindings: extractStrings(tech.deployment?.findings),
@@ -2333,14 +2277,17 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
     deploymentRaw: job?.deployment ?? report?.deployment ?? null,
 
     kubernetesTitle: tech.kubernetes?.title ?? "Kubernetes",
+    kubernetesStatus: tech.kubernetes?.status ?? null,
     kubernetesSummary: tech.kubernetes?.summary ?? "-",
     kubernetesCount: tech.kubernetes?.findings?.length ?? 0,
     kubernetesFindings: extractStrings(tech.kubernetes?.findings),
     kubernetesPods,
     kubernetesEvents,
     kubernetesRaw: job?.kubernetes ?? report?.kubernetes ?? null,
+    podsStatus: tech.pods?.status ?? tech.kubernetes?.status ?? null,
 
     networkTitle: tech.network?.title ?? "Network",
+    networkStatus: tech.network?.status ?? null,
     networkSummary: tech.network?.summary ?? "-",
     networkCount: tech.network?.findings?.length ?? 0,
     networkFindings: extractStrings(tech.network?.findings),
@@ -2350,8 +2297,29 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
     depsCount: tech.dependency?.findings?.length ?? 0,
     depsFindings: extractStrings(tech.dependency?.findings),
     dependencyItems,
+
+    pubsubTitle: tech.pubsub?.title ?? "Pub/Sub",
+    pubsubStatus: tech.pubsub?.status ?? "SKIPPED",
+    pubsubSummary: tech.pubsub?.summary ?? "-",
+    pubsubCount: tech.pubsub?.findings?.length ?? 0,
+    pubsubFindings: extractStrings(tech.pubsub?.findings),
+    pubsubRaw: tech.pubsub ?? null,
+
     databaseImpact: report?.database ?? job?.database ?? null,
+    databaseStatus:
+      tech.database?.status ??
+      report?.database?.status ??
+      job?.database?.status ??
+      null,
     dependencyRaw: job?.dependency ?? report?.dependency ?? null,
+
+    redisStatus:
+      tech.redis?.status ??
+      findDependencyByKeywords(
+        dependencyItems,
+        ["redis", "cache", "memory store"]
+      )?.status ??
+      null,
 
     applicationName,
     environment,

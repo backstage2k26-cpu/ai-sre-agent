@@ -38,6 +38,8 @@ from app.core.config import settings
 from app.repositories.incident_repository import IncidentRepository
 from app.database.session import SessionLocal
 from app.clients.kubernetes_client import KubernetesClient
+from app.services.pubsub_service import PubSubService
+from app.planner.pubsub_planner import PubSubPlanner
 
 
 
@@ -69,6 +71,8 @@ class InvestigationService:
         self.incident_repo = IncidentRepository(self.db)
         self.kubernetes = KubernetesService()
         self.kubernetes_client = KubernetesClient()
+        self.pubsub = PubSubService()
+        self.pubsub_planner = PubSubPlanner()
 
     async def investigate(
         self,
@@ -215,6 +219,39 @@ class InvestigationService:
         if progress_callback:
             progress_callback(40, "Collecting Evidence")
 
+        planner = self.pubsub_planner.plan(logs)
+
+        if planner.pubsub:
+
+            print("\n========== PUBSUB ==========")
+            print("Planner selected Pub/Sub investigation")
+
+            pubsub = await self.pubsub.investigate(
+                context.application_name
+            )
+
+        else:
+
+            print("\n========== PUBSUB ==========")
+            print("Planner skipped Pub/Sub investigation")
+
+            pubsub = self.pubsub.skipped_assessment()
+        
+        print("\n========== PUBSUB ==========")
+        print(f"Status       : {pubsub.status}")
+        print(f"Severity     : {pubsub.severity}")
+        print(f"Topic        : {pubsub.topic}")
+        print(f"Subscription : {pubsub.subscription}")
+        print(f"Backlog      : {pubsub.backlog}")
+        print(
+            f"Oldest Age   : "
+            f"{pubsub.oldest_unacked_age_seconds}"
+        )
+        print(f"Summary      : {pubsub.summary}")
+
+        for finding in pubsub.findings:
+            print(f"Finding      : {finding}")
+
         
         log_summary = self.log_analyzer.analyse(logs)
         print("\n========== LOG SUMMARY ==========")
@@ -260,6 +297,7 @@ class InvestigationService:
             metrics=metrics,
             network=network,
             dependency=dependency,
+            pubsub=pubsub,
             log_summary=log_summary,
             executive=ExecutiveSummary(
                 summary=[],
@@ -512,38 +550,173 @@ class InvestigationService:
             "technical_investigation": {
                 "logs": {
                     "title": "Logs",
+
+                    "status": (
+                        "UNKNOWN"
+                        if len(summary.logs.entries) == 0
+                        else (
+                            "PROBLEM"
+                            if summary.logs.assessment.severity == "HIGH"
+                            else (
+                                "WARNING"
+                                if summary.logs.assessment.severity == "MEDIUM"
+                                else "HEALTHY"
+                            )
+                        )
+                    ),
+
+                    "severity": (
+                        "UNKNOWN"
+                        if len(summary.logs.entries) == 0
+                        else summary.logs.assessment.severity
+                    ),
+
                     "summary": summary.logs.assessment.summary,
-                    "findings": getattr(summary.logs.assessment, "findings", []),
+
+                    "findings": getattr(
+                        summary.logs.assessment,
+                        "findings",
+                        [],
+                    ),
                 },
+
                 "metrics": {
                     "title": "Metrics",
+
+                    "status": (
+                        "PROBLEM"
+                        if summary.metrics.assessment.severity == "HIGH"
+                        else (
+                            "WARNING"
+                            if summary.metrics.assessment.severity == "MEDIUM"
+                            else "HEALTHY"
+                        )
+                    ),
+
+                    "severity": summary.metrics.assessment.severity,
+
                     "summary": summary.metrics.assessment.summary,
-                    "findings": getattr(summary.metrics.assessment, "findings", []),
+
+                    "findings": getattr(
+                        summary.metrics.assessment,
+                        "findings",
+                        [],
+                    ),
                 },
+
                 "deployment": {
                     "title": "Deployment",
+
+                    "status": (
+                        "PROBLEM"
+                        if summary.deployment.assessment.severity == "HIGH"
+                        else (
+                            "WARNING"
+                            if summary.deployment.assessment.severity == "MEDIUM"
+                            else "HEALTHY"
+                        )
+                    ),
+
+                    "severity": summary.deployment.assessment.severity,
+
                     "summary": summary.deployment.assessment.summary,
-                    "findings": getattr(summary.deployment.assessment, "findings", []),
+
+                    "findings": getattr(
+                        summary.deployment.assessment,
+                        "findings",
+                        [],
+                    ),
                 },
+
                 "kubernetes": {
                     "title": "Kubernetes",
+
+                    "status": (
+                        "PROBLEM"
+                        if summary.kubernetes.assessment.severity == "HIGH"
+                        else (
+                            "WARNING"
+                            if summary.kubernetes.assessment.severity == "MEDIUM"
+                            else "HEALTHY"
+                        )
+                    ),
+
+                    "severity": summary.kubernetes.assessment.severity,
+
                     "summary": summary.kubernetes.assessment.summary,
-                    "findings": getattr(summary.kubernetes.assessment, "findings", []),
+
+                    "findings": getattr(
+                        summary.kubernetes.assessment,
+                        "findings",
+                        [],
+                    ),
                 },
+
                 "network": {
                     "title": "Network",
+
+                    "status": (
+                        "HEALTHY"
+                        if (
+                            summary.network.gateway_ok
+                            and summary.network.route_ok
+                            and summary.network.endpoint_ok
+                        )
+                        else "PROBLEM"
+                    ),
+
+                    "severity": (
+                        "LOW"
+                        if (
+                            summary.network.gateway_ok
+                            and summary.network.route_ok
+                            and summary.network.endpoint_ok
+                        )
+                        else "HIGH"
+                    ),
+
                     "summary": summary.network.assessment,
+
                     "findings": [],
                 },
+
                 "dependency": {
                     "title": "Dependencies",
                     "summary": summary.dependency.assessment,
                     "findings": [],
                 },
+
+                # -------------------------------------------------
+                # Pub/Sub
+                # -------------------------------------------------
+
+                "pubsub": {
+                    "title": "Pub/Sub",
+                    "status": summary.pubsub.status,
+                    "severity": summary.pubsub.severity,
+                    "summary": summary.pubsub.summary,
+                    "findings": summary.pubsub.findings,
+
+                    "topic": summary.pubsub.topic,
+                    "subscription": summary.pubsub.subscription,
+                    "backlog": summary.pubsub.backlog,
+                    "oldest_unacked_age_seconds": (
+                        summary.pubsub.oldest_unacked_age_seconds
+                    ),
+                },
+
                 "database": {
                     "title": "Database",
-                    "summary": summary.database_impact.summary if summary.database_impact else "No database impact analysis available.",
-                    "findings": summary.database_impact.evidence if summary.database_impact else [],
+                    "summary": (
+                        summary.database_impact.summary
+                        if summary.database_impact
+                        else "No database impact analysis available."
+                    ),
+                    "findings": (
+                        summary.database_impact.evidence
+                        if summary.database_impact
+                        else []
+                    ),
                 },
             },
             "kubernetes": {
