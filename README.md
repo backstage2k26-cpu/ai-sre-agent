@@ -165,6 +165,14 @@ npm install
 
 # PostgreSQL
 
+docker run -d \
+  --name postgres \
+  -e POSTGRES_USER=postgres \
+  -e POSTGRES_PASSWORD=postgres \
+  -e POSTGRES_DB=backstage \
+  -p 5432:5432 \
+  postgres:17
+
 # 1. Inspecting the Postgres container to check its credentials
 docker inspect postgres | grep -i env -A 10
 # 2. Creating the missing user in your running Postgres container
