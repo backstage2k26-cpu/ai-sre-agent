@@ -165,6 +165,13 @@ npm install
 
 # PostgreSQL
 
+# 1. Inspecting the Postgres container to check its credentials
+docker inspect postgres | grep -i env -A 10
+# 2. Creating the missing user in your running Postgres container
+docker exec postgres psql -U postgres -c "CREATE USER agent WITH PASSWORD 'agent123';"
+# 3. Creating the missing database and assigning ownership
+docker exec postgres psql -U postgres -c "CREATE DATABASE incident_agent OWNER agent;"
+
 Start PostgreSQL
 
 ```bash
