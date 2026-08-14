@@ -51,7 +51,7 @@ export default function Sidebar() {
           boxSizing: "border-box",
           borderRight: "none",
           background:
-            "linear-gradient(180deg, #1E2F59 0%, #1D2C53 35%, #162447 100%)",
+            "linear-gradient(180deg, #142543 0%, #16284a 38%, #0f1b34 100%)",
           color: "#fff",
           padding: 0,
           overflow: "hidden",
@@ -61,7 +61,7 @@ export default function Sidebar() {
         },
       }}
     >
-      <Box sx={{ px: 2.25, pt: 1.6, pb: 0 }}>
+      <Box sx={{ px: 2.25, pt: 3.2, pb: 0 }}>
         <Box sx={{ display: "flex", alignItems: "center", gap: 1.15 }}>
           <Box
             sx={{
@@ -99,7 +99,7 @@ export default function Sidebar() {
       <List
         sx={{
           px: 2,
-          pt: 2,
+          pt: 3,
           mt: 0,
         }}
       >

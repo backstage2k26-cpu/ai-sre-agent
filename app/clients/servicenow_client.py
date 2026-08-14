@@ -18,7 +18,6 @@ class ServiceNowClient:
             settings.servicenow_password,
         )
         self.timeout = settings.request_timeout
-        print("ServiceNow URL:", self.base_url)
 
     async def get_incident_list(self, limit: int = 1000):
 

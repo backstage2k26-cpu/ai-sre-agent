@@ -8,6 +8,7 @@ from alembic import context
 from app.core.config import settings
 from app.database.base import Base
 from app.models.investigation import Investigation
+from app.models.investigation_run import InvestigationRun
 from app.models.incident import Incident
 
 # Alembic Config object

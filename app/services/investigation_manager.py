@@ -68,6 +68,11 @@ class InvestigationManager:
             current_step="Received",
         )
 
+        self.repository.create_run(
+            investigation_id=investigation.investigation_id,
+            run_type="initial",
+        )
+
         await self.queue.submit(request)
 
         return investigation
@@ -102,17 +107,22 @@ class InvestigationManager:
         investigation = self.repository.restart(
             request.incident.incident_number,
         )
-        request.investigation_id = investigation.investigation_id
-        print("================================")
-        print("Restarting DB Investigation:", investigation.investigation_id)
-        print("Queued Investigation:", request.investigation_id)
-        print("================================")
 
         if investigation is None:
             raise ValueError(
                 f"Investigation not found for incident "
                 f"{request.incident.incident_number}"
             )
+
+        request.investigation_id = investigation.investigation_id
+        self.repository.create_run(
+            investigation_id=investigation.investigation_id,
+            run_type="restart",
+        )
+        print("================================")
+        print("Restarting DB Investigation:", investigation.investigation_id)
+        print("Queued Investigation:", request.investigation_id)
+        print("================================")
 
         await self.queue.submit(request)
 

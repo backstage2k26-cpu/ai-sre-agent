@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import type { CSSProperties, ReactNode } from "react";
 import RefreshRoundedIcon from "@mui/icons-material/RefreshRounded";
 import AutoAwesomeRoundedIcon from "@mui/icons-material/AutoAwesomeRounded";
@@ -24,13 +25,16 @@ import { getRecentIncidents } from "../services/recentIncidentService";
 import type { Incident } from "../types/incident";
 import {
   ResponsiveContainer,
-  LineChart,
+  ComposedChart,
   Line,
+  Area,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip as RechartsTooltip,
-  Legend,
+  PieChart,
+  Pie,
+  Cell,
 } from "recharts";
 
 type Metric = {
@@ -174,25 +178,83 @@ function Panel({
 const CustomTooltip = ({ active, payload, label }: any) => {
   if (!active || !payload?.length) return null;
 
+  const created = payload.find((p: any) => p.dataKey === "created")?.value ?? 0;
+  const resolved = payload.find((p: any) => p.dataKey === "resolved")?.value ?? 0;
+  const net = created - resolved;
+
   return (
     <Box
       sx={{
-        background: "#fff",
+        background: "rgba(255,255,255,0.98)",
+        backdropFilter: "blur(8px)",
         border: "1px solid #e5e7eb",
-        borderRadius: 2,
-        p: 1.5,
-        boxShadow: "0 8px 24px rgba(0,0,0,0.12)",
+        borderRadius: 3,
+        px: 2,
+        py: 1.5,
+        minWidth: 170,
+        boxShadow: "0 16px 40px rgba(15,23,42,0.16)",
       }}
     >
-      <Typography fontWeight={700}>{label}</Typography>
+      <Box
+        sx={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          gap: 3,
+          pb: 1,
+          mb: 1,
+          borderBottom: "1px solid #f1f5f9",
+        }}
+      >
+        <Typography
+          sx={{ fontSize: 13, fontWeight: 800, color: "#0f172a" }}
+        >
+          {label}
+        </Typography>
 
-      <Typography sx={{ color: "#1d4ed8", mt: 0.5 }}>
-        ● Created : {payload[0].value}
-      </Typography>
+        <Box
+          sx={{
+            display: "inline-flex",
+            alignItems: "center",
+            px: 1,
+            py: 0.25,
+            borderRadius: 999,
+            fontSize: 11,
+            fontWeight: 800,
+            color: net === 0 ? "#64748b" : net > 0 ? "#dc2626" : "#16a34a",
+            bgcolor:
+              net === 0
+                ? "#f1f5f9"
+                : net > 0
+                  ? "#fef2f2"
+                  : "#ecfdf5",
+          }}
+        >
+          {net > 0 ? "▲" : net < 0 ? "▼" : "◆"} {Math.abs(net)} net
+        </Box>
+      </Box>
 
-      <Typography sx={{ color: "#f97316" }}>
-        ● Resolved : {payload[1].value}
-      </Typography>
+      <Box sx={{ display: "flex", flexDirection: "column", gap: 0.75 }}>
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box sx={{ width: 9, height: 9, borderRadius: 999, bgcolor: "#2563eb" }} />
+          <Typography sx={{ fontSize: 13, color: "#64748b", flex: 1 }}>
+            Created
+          </Typography>
+          <Typography sx={{ fontSize: 14, fontWeight: 800, color: "#0f172a" }}>
+            {created}
+          </Typography>
+        </Box>
+
+        <Box sx={{ display: "flex", alignItems: "center", gap: 1 }}>
+          <Box sx={{ width: 9, height: 9, borderRadius: 999, bgcolor: "#f97316" }} />
+          <Typography sx={{ fontSize: 13, color: "#64748b", flex: 1 }}>
+            Resolved
+          </Typography>
+          <Typography sx={{ fontSize: 14, fontWeight: 800, color: "#0f172a" }}>
+            {resolved}
+          </Typography>
+        </Box>
+      </Box>
     </Box>
   );
 };
@@ -261,6 +323,7 @@ const deltaTone = (
 };
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   const [dashboard, setDashboard] = useState<DashboardResponse | null>(null);
   const [recentIncidents, setRecentIncidents] = useState<RecentIncident[]>([]);
 
@@ -275,16 +338,20 @@ export default function Dashboard() {
     try {
       const [dashboardData, incidents, trend] = await Promise.all([
         getDashboard(),
-        getRecentIncidents(),
+        getRecentIncidents(20),
         getIncidentTrend(),
       ]);
 
       setTrendData(trend);
-      console.log(trend);
 
       setDashboard(dashboardData);
       setRecentIncidents(incidents);
       setUpdatedAt(formatClockLabel(new Date()));
+
+      // Also refresh the ServiceNow connection status
+      getServiceNowStatus()
+        .then((status) => setServiceNowOnline(status.online))
+        .catch(() => setServiceNowOnline(false));
     } catch (error) {
       console.error("Failed to load dashboard:", error);
     } finally {
@@ -430,15 +497,19 @@ export default function Dashboard() {
   }, [dashboard, recentIncidents]);
 
   const affectedApps = useMemo(() => {
-    const counts = new Map<string, number>();
+    const counts = new Map<string, { value: number; incidentNumber: string }>();
 
     for (const incident of recentIncidents) {
-      const key = incident.service || incident.short_description.split(" ")[0] || "unknown";
-      counts.set(key, (counts.get(key) ?? 0) + 1);
+      const key = incident.service?.trim() || "Unknown";
+      const current = counts.get(key);
+      counts.set(key, {
+        value: (current?.value ?? 0) + 1,
+        incidentNumber: current?.incidentNumber ?? incident.number,
+      });
     }
 
     return Array.from(counts.entries())
-      .map(([name, value]) => ({ name, value }))
+      .map(([name, item]) => ({ name, value: item.value, incidentNumber: item.incidentNumber }))
       .sort((a, b) => b.value - a.value)
       .slice(0, 5);
   }, [recentIncidents]);
@@ -462,7 +533,11 @@ export default function Dashboard() {
   const recentAiInvestigations = useMemo(() => {
     return recentIncidents
       .filter((incident) => incident.investigation_id)
-      .slice(0, 2);
+      .slice(0, 5);
+  }, [recentIncidents]);
+
+  const visibleRecentIncidents = useMemo(() => {
+    return recentIncidents.slice(0, 5);
   }, [recentIncidents]);
 
   const recommendations = useMemo(() => {
@@ -530,13 +605,11 @@ export default function Dashboard() {
               }`}
             >
               <span className="dashboard-connection-dot" />
-              <NetworkCheckRoundedIcon className="dashboard-connection-icon" />
               <span className="dashboard-connection-text">
-                ServiceNow{" "}
                 {serviceNowOnline === false
                   ? "Offline"
                   : serviceNowOnline === true
-                    ? "Connected"
+                    ? "Online"
                     : "Checking"}
               </span>
             </Box>
@@ -610,38 +683,41 @@ export default function Dashboard() {
                 compact: true,
               })}
 
-              <Box className="dashboard-legend">
-                <Box className="legend-item">
-                  <Box
-                    sx={{
-                      width: 10,
-                      height: 10,
-                      borderRadius: "50%",
-                      bgcolor: "#2563eb",
-                    }}
-                  />
-                  <Typography>Created</Typography>
+              <Box className="trend-summary">
+                <Box className="trend-summary-chip trend-chip-created">
+                  <Typography className="trend-chip-label">Created</Typography>
+                  <Typography className="trend-chip-value">
+                    {trendData.reduce((s, d) => s + d.created, 0)}
+                  </Typography>
                 </Box>
 
-                <Box className="legend-item">
-                  <Box
-                    sx={{
-                      width: 10,
-                      height: 10,
-                      borderRadius: "50%",
-                      bgcolor: "#f97316",
-                    }}
-                  />
-                  <Typography>Resolved</Typography>
+                <Box className="trend-summary-chip trend-chip-resolved">
+                  <Typography className="trend-chip-label">Resolved</Typography>
+                  <Typography className="trend-chip-value">
+                    {trendData.reduce((s, d) => s + d.resolved, 0)}
+                  </Typography>
+                </Box>
+
+                <Box className="trend-summary-chip trend-chip-rate">
+                  <Typography className="trend-chip-label">Res. Rate</Typography>
+                  <Typography className="trend-chip-value">
+                    {(() => {
+                      const created = trendData.reduce((s, d) => s + d.created, 0);
+                      const resolved = trendData.reduce((s, d) => s + d.resolved, 0);
+                      return created === 0
+                        ? "0%"
+                        : `${Math.round((resolved / created) * 100)}%`;
+                    })()}
+                  </Typography>
                 </Box>
               </Box>
             </Box>
 
-            <Box sx={{ width: "100%", height: 340, mt: 2 }}>
+            <Box sx={{ width: "100%", flex: 1, minHeight: 0, mt: 2 }}>
 
               <ResponsiveContainer width="100%" height="100%">
 
-                <LineChart
+                <ComposedChart
                   data={trendData}
                   margin={{
                     top: 10,
@@ -651,28 +727,75 @@ export default function Dashboard() {
                   }}
                 >
 
+                  <defs>
+                    <linearGradient id="gradCreated" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#2563eb" stopOpacity={0.28} />
+                      <stop offset="100%" stopColor="#2563eb" stopOpacity={0.02} />
+                    </linearGradient>
+                    <linearGradient id="gradResolved" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#f97316" stopOpacity={0.26} />
+                      <stop offset="100%" stopColor="#f97316" stopOpacity={0.02} />
+                    </linearGradient>
+                  </defs>
+
                   <CartesianGrid
                     strokeDasharray="4 4"
                     vertical={false}
+                    stroke="#eef2f7"
                   />
 
                   <XAxis
                     dataKey="day"
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: "#94a3b8", fontWeight: 600 }}
+                    dy={8}
                   />
 
                   <YAxis
                     allowDecimals={false}
+                    axisLine={false}
+                    tickLine={false}
+                    tick={{ fontSize: 12, fill: "#94a3b8", fontWeight: 600 }}
+                    width={30}
                   />
 
-                  <RechartsTooltip content={<CustomTooltip />} />
+                  <RechartsTooltip
+                    content={<CustomTooltip />}
+                    cursor={{
+                      stroke: "#cbd5e1",
+                      strokeWidth: 1,
+                      strokeDasharray: "4 4",
+                    }}
+                  />
+
+                  <Area
+                    type="monotone"
+                    dataKey="created"
+                    stroke="none"
+                    fill="url(#gradCreated)"
+                  />
+
+                  <Area
+                    type="monotone"
+                    dataKey="resolved"
+                    stroke="none"
+                    fill="url(#gradResolved)"
+                  />
 
                   <Line
                     type="monotone"
                     dataKey="created"
                     stroke="#2563eb"
                     strokeWidth={3}
-                    dot={{ r: 5 }}
-                    activeDot={{ r: 8 }}
+                    dot={{ r: 4, strokeWidth: 2, fill: "#fff", stroke: "#2563eb" }}
+                    activeDot={{
+                      r: 7,
+                      fill: "#2563eb",
+                      stroke: "#fff",
+                      strokeWidth: 3,
+                    }}
+                    animationDuration={900}
                   />
 
                   <Line
@@ -680,11 +803,17 @@ export default function Dashboard() {
                     dataKey="resolved"
                     stroke="#f97316"
                     strokeWidth={3}
-                    dot={{ r: 5 }}
-                    activeDot={{ r: 8 }}
+                    dot={{ r: 4, strokeWidth: 2, fill: "#fff", stroke: "#f97316" }}
+                    activeDot={{
+                      r: 7,
+                      fill: "#f97316",
+                      stroke: "#fff",
+                      strokeWidth: 3,
+                    }}
+                    animationDuration={900}
                   />
 
-                </LineChart>
+                </ComposedChart>
 
               </ResponsiveContainer>
 
@@ -698,104 +827,102 @@ export default function Dashboard() {
               subtitle: "Currently open",
               compact: true,
             })}
-            <Box
-              className="donut-wrap"
-              sx={{
-                mt: 2,
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                gap: 3,
-                height: 220,          // instead of filling the whole panel
-                flex: "0 0 auto",     // don't stretch
-              }}
-            >
-              {(() => {
-                const total = priorityCounts.reduce((sum, p) => sum + p.value, 0);
 
-                const critical =
-                  total === 0 ? 0 : (priorityCounts[0]?.value / total) * 100;
+            {(() => {
+              const total = priorityCounts.reduce((sum, p) => sum + p.value, 0);
+              const withData = priorityCounts.filter((p) => p.value > 0);
+              const chartData = withData.length > 0 ? withData : priorityCounts.map((p) => ({ ...p, value: 1 }));
 
-                const high =
-                  total === 0 ? 0 : (priorityCounts[1]?.value / total) * 100;
-
-                const medium =
-                  total === 0 ? 0 : (priorityCounts[2]?.value / total) * 100;
-
-                const low =
-                  total === 0 ? 0 : (priorityCounts[3]?.value / total) * 100;
-
-                return (
-                  <>
-                    <Box
-                      className="donut-chart"
-                      sx={{
-                        background: `conic-gradient(
-                          #ef4444 0 ${critical}%,
-                          #eab308 ${critical}% ${critical + high}%,
-                          #0284c7 ${critical + high}% ${
-                          critical + high + medium
-                        }%,
-                          #16a34a ${critical + high + medium}% 100%
-                        )`,
-                      }}
-                    >
-                      <Box className="donut-hole" />
-                    </Box>
-
-                    <Box className="priority-legend">
-                      {priorityCounts.map((item) => (
-                        <Box
-                          key={item.label}
-                          sx={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "space-between",
-                            py: 0.35,
-                            minHeight: 30,
-                          }}
+              return total === 0 ? (
+                <Box className="donut-empty">
+                  <Typography>No open incidents by priority.</Typography>
+                </Box>
+              ) : (
+                <Box className="donut-wrap">
+                  <Box className="donut-chart rich-donut" sx={{ position: "relative" }}>
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <defs>
+                          <linearGradient id="donutCritical" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stopColor="#f87171" />
+                            <stop offset="100%" stopColor="#dc2626" />
+                          </linearGradient>
+                          <linearGradient id="donutHigh" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stopColor="#fbbf24" />
+                            <stop offset="100%" stopColor="#d97706" />
+                          </linearGradient>
+                          <linearGradient id="donutMedium" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stopColor="#38bdf8" />
+                            <stop offset="100%" stopColor="#0284c7" />
+                          </linearGradient>
+                          <linearGradient id="donutLow" x1="0" y1="0" x2="1" y2="1">
+                            <stop offset="0%" stopColor="#4ade80" />
+                            <stop offset="100%" stopColor="#16a34a" />
+                          </linearGradient>
+                        </defs>
+                        <Pie
+                          data={chartData}
+                          dataKey="value"
+                          nameKey="label"
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={54}
+                          outerRadius={78}
+                          paddingAngle={3}
+                          cornerRadius={10}
+                          stroke="none"
+                          animationDuration={800}
                         >
-                          <Box
-                            sx={{
-                              display: "flex",
-                              alignItems: "center",
-                              gap: 1,
-                            }}
-                          >
-                            <Box
-                              sx={{
-                                width: 10,
-                                height: 10,
-                                borderRadius: "50%",
-                                bgcolor: item.color,
-                              }}
+                          {chartData.map((item) => (
+                            <Cell
+                              key={item.label}
+                              fill={`url(#donut${item.label})`}
                             />
+                          ))}
+                        </Pie>
+                      </PieChart>
+                    </ResponsiveContainer>
 
-                            <Typography
-                              sx={{
-                                fontSize: 14,
-                                fontWeight: 500,
-                              }}
-                            >
-                              {item.label}
-                            </Typography>
+                    <Box className="donut-center">
+                      <Typography className="donut-center-value">{total}</Typography>
+                      <Typography className="donut-center-label">Open</Typography>
+                    </Box>
+                  </Box>
+
+                  <Box className="priority-legend">
+                    {priorityCounts.map((item) => {
+                      const pct = total === 0 ? 0 : Math.round((item.value / total) * 100);
+                      return (
+                        <Box key={item.label} className="priority-item">
+                          <Box className="priority-label">
+                            <Box
+                              className="priority-dot"
+                              sx={{ bgcolor: item.color }}
+                            />
+                            <span>{item.label}</span>
                           </Box>
 
-                          <Typography
-                            sx={{
-                              color: "#667085",
-                              fontWeight: 600,
-                            }}
-                          >
-                            {item.value}
-                          </Typography>
+                          <Box className="priority-meta">
+                            <Typography className="priority-value">{item.value}</Typography>
+                            <Typography className="priority-pct">{pct}%</Typography>
+                          </Box>
+
+                          <Box className="priority-bar-track">
+                            <Box
+                              className="priority-bar-fill"
+                              sx={{
+                                width: `${pct}%`,
+                                background: `linear-gradient(90deg, ${item.color}cc, ${item.color})`,
+                              }}
+                            />
+                          </Box>
                         </Box>
-                      ))}
-                    </Box>
-                  </>
-                );
-              })()}
-            </Box>
+                      );
+                    })}
+                  </Box>
+                </Box>
+              );
+            })()}
           </Panel>
         </Box>
       </Box>
@@ -812,7 +939,12 @@ export default function Dashboard() {
                 <Typography className="dashboard-subtitle">No recent incidents found.</Typography>
               ) : (
                 affectedApps.map((app) => (
-                  <Box key={app.name} className="app-item">
+                  <Box
+                    key={app.name}
+                    className="app-item"
+                    sx={{ cursor: "pointer" }}
+                    onClick={() => navigate("/incidents", { state: { openIncident: app.incidentNumber } })}
+                  >
                     <Box className="app-row">
                       <Typography className="app-name">{app.name}</Typography>
                       <Typography className="app-count">{app.value}</Typography>
@@ -832,10 +964,10 @@ export default function Dashboard() {
             </Box>
 
             <Box className="incident-list">
-              {recentIncidents.length === 0 ? (
+              {visibleRecentIncidents.length === 0 ? (
                 <Typography className="dashboard-subtitle">No incidents available.</Typography>
               ) : (
-                recentIncidents.map((incident) => {
+                visibleRecentIncidents.map((incident) => {
                   const style = severityTone(incident.priority);
                   return (
                     <Box key={incident.number} className="incident-item">
@@ -873,7 +1005,12 @@ export default function Dashboard() {
                 recentAiInvestigations.map((item) => {
                   const pill = statusTone(item.investigation_status);
                   return (
-                    <Box key={item.number} className="ai-item">
+                    <Box
+                      key={item.number}
+                      className="ai-item"
+                      sx={{ cursor: "pointer" }}
+                      onClick={() => navigate("/incidents", { state: { openIncident: item.number } })}
+                    >
                       <Box className="ai-avatar">
                         <AssistantRoundedIcon fontSize="small" />
                       </Box>

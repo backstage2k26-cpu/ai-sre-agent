@@ -15,6 +15,11 @@ class Settings(BaseSettings):
     loki_datasource_uid: str
     prometheus_datasource_uid: str
 
+    grafana_url: str
+    grafana_token: str
+    grafana_mcp_url: str
+    kubernetes_mcp_url: str
+
     argocd_url: str
     argocd_token: str
 

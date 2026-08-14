@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import {
   Box,
@@ -11,6 +12,7 @@ import {
   Grid,
   Stack,
 } from "@mui/material";
+import KeyboardArrowDownIcon from "@mui/icons-material/KeyboardArrowDown";
 import ArrowBackIcon from "@mui/icons-material/ArrowBack";
 import ContentCopyOutlinedIcon from "@mui/icons-material/ContentCopyOutlined";
 import AppsIcon from "@mui/icons-material/Apps";
@@ -36,11 +38,20 @@ import {
 import {
   getInvestigation,
   getSimilarIncidents,
+  refreshSimilarIncidents,
   type SimilarIncident,
 } from "../services/investigationService";
 const API = "http://localhost:8000";
 
 type AnyObj = Record<string, any>;
+type InvestigationRun = {
+  id?: number;
+  investigation_id?: string;
+  run_number?: number;
+  run_type?: string;
+  tokens_consumed?: number;
+  created_at?: string;
+};
 
 export default function InvestigationReport() {
   const { investigationId } = useParams();
@@ -49,6 +60,8 @@ export default function InvestigationReport() {
   const [incidentPayload, setIncidentPayload] = useState<AnyObj | null>(null);
   const [loading, setLoading] = useState(true);
   const [similarIncidents, setSimilarIncidents] = useState<SimilarIncident[]>([]);
+  const [refreshingSimilar, setRefreshingSimilar] = useState(false);
+  const [tokenBreakdownOpen, setTokenBreakdownOpen] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -56,7 +69,15 @@ export default function InvestigationReport() {
     async function load() {
       try {
         const data = await getInvestigation(investigationId!);
-        if (mounted) setJob(data);
+        if (mounted) {
+          setJob(data);
+          setSimilarIncidents(
+            data?.report?.similar_incidents ??
+            data?.result?.similar_incidents ??
+            data?.similar_incidents ??
+            []
+          );
+        }
       } catch (err) {
         console.error(err);
       } finally {
@@ -65,36 +86,6 @@ export default function InvestigationReport() {
     }
 
     load();
-    return () => {
-      mounted = false;
-    };
-  }, [investigationId]);
-
-  useEffect(() => {
-    if (!investigationId) return;
-
-    let mounted = true;
-
-    async function loadSimilarIncidents() {
-      try {
-        const incidents = await getSimilarIncidents(investigationId);
-
-        console.log("SIMILAR INCIDENTS:", incidents);
-
-        if (mounted) {
-          setSimilarIncidents(incidents);
-        }
-      } catch (err) {
-        console.error("Failed to load similar incidents:", err);
-
-        if (mounted) {
-          setSimilarIncidents([]);
-        }
-      }
-    }
-
-    loadSimilarIncidents();
-
     return () => {
       mounted = false;
     };
@@ -160,6 +151,21 @@ export default function InvestigationReport() {
   const data = useMemo(() => buildData(job, report, incidentPayload), [job, report, incidentPayload]);
   const isFailed = data.reportState === "failed";
 
+  const refreshSimilarIncidents = async () => {
+    if (!investigationId) return;
+
+    try {
+      setRefreshingSimilar(true);
+      const incidents = await refreshSimilarIncidents(investigationId);
+      setSimilarIncidents(incidents);
+    } catch (err) {
+      console.error("Failed to refresh similar incidents:", err);
+      setSimilarIncidents([]);
+    } finally {
+      setRefreshingSimilar(false);
+    }
+  };
+
   if (loading) {
     return (
       <Box sx={{ p: 4 }}>
@@ -181,7 +187,16 @@ export default function InvestigationReport() {
       <Container maxWidth={false} sx={{ px: { xs: 2, md: 3 }, py: 2.5 }}>
         <TopBar navigate={navigate} />
 
-        {isFailed ? <FailureHero data={data} /> : <Hero data={data} />}
+        {isFailed ? (
+          <FailureHero data={data} />
+        ) : (
+          <Hero
+            data={data}
+            onTokenEnter={() => setTokenBreakdownOpen(true)}
+            onTokenLeave={() => setTokenBreakdownOpen(false)}
+            tokenPopoverOpen={tokenBreakdownOpen}
+          />
+        )}
 
         {isFailed ? (
           <>
@@ -277,6 +292,21 @@ export default function InvestigationReport() {
               tag="PATTERN INTELLIGENCE"
               title="Similar Incidents"
               subtitle="Historical incidents with matching signatures, ranked by similarity."
+              rightSlot={
+                <Button
+                  variant="outlined"
+                  size="small"
+                  onClick={refreshSimilarIncidents}
+                  disabled={refreshingSimilar}
+                  sx={{
+                    textTransform: "none",
+                    borderRadius: 999,
+                    fontWeight: 700,
+                  }}
+                >
+                  {refreshingSimilar ? "Refreshing..." : "Rerun Similar"}
+                </Button>
+              }
             />
             <SimilarIncidentsSection
               data={data}
@@ -299,10 +329,20 @@ function TopBar({ navigate }: { navigate: (path: string) => void }) {
   );
 }
 
-function Hero({ data }: { data: AnyObj }) {
+function Hero({
+  data,
+  onTokenEnter,
+  onTokenLeave,
+  tokenPopoverOpen,
+}: {
+  data: AnyObj;
+  onTokenEnter: (event: ReactMouseEvent<HTMLElement>) => void;
+  onTokenLeave: () => void;
+  tokenPopoverOpen: boolean;
+}) {
   const inspectedComponents = buildTechnicalCards(data).length;
   return (
-    <Paper sx={{ p: { xs: 1.75, md: 2.1 }, borderRadius: 4, background: "linear-gradient(135deg, #1F3358 0%, #344a72 100%)", color: "#fff", boxShadow: "0 18px 42px rgba(15,23,42,0.18)" }}>
+    <Paper sx={{ p: { xs: 1.75, md: 2.1 }, borderRadius: 4, background: "linear-gradient(135deg, #162843 0%, #273a60 100%)", color: "#fff", boxShadow: "0 18px 42px rgba(15,23,42,0.18)" }}>
       <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1fr 280px" }, gap: 1.75 }}>
         <Box>
           <Typography sx={{ ...eyebrowSx, fontSize: 10.5 }}>
@@ -327,7 +367,6 @@ function Hero({ data }: { data: AnyObj }) {
           <Typography sx={{ mt: 0.3, color: "rgba(255,255,255,0.92)", fontSize: { xs: 12.5, md: 13.5 }, lineHeight: 1.32 }}>
             {data.heroHow || "No dynamic data available"}
           </Typography>
-          
           <Box
             sx={{
               mt: 1,
@@ -361,11 +400,178 @@ function Hero({ data }: { data: AnyObj }) {
         <Box sx={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 1.1 }}>
           <HeroStat label="CONFIDENCE" value={data.heroConfidence == null ? "-" : `${data.heroConfidence}%`} />
           <HeroStat label="INVESTIGATION" value={data.heroDuration || "-"} />
-          <HeroStat label="COMPONENTS" value={inspectedComponents} />
+          <HeroStat label="COMPONENTS" value={`${inspectedComponents}`} />
           <HeroStat label="ETA" value={data.heroEta} />
+          <Box
+            sx={{
+              gridColumn: "1 / -1",
+              display: "grid",
+              gap: 1.25,
+              position: "relative",
+            }}
+            onMouseEnter={onTokenEnter}
+            onMouseLeave={onTokenLeave}
+          >
+            <Box
+              sx={{
+                p: { xs: 1.2, md: 1.35 },
+                minHeight: 74,
+                borderRadius: 2.6,
+                bgcolor: "rgba(255,255,255,0.08)",
+                border: "1px solid rgba(255,255,255,0.12)",
+                display: "flex",
+                flexDirection: "column",
+                justifyContent: "space-between",
+                cursor: "default",
+                transition: "transform 140ms ease, border-color 140ms ease, background 140ms ease",
+                "&:hover": {
+                  transform: "translateY(-1px)",
+                  borderColor: "rgba(255,255,255,0.22)",
+                  bgcolor: "rgba(255,255,255,0.11)",
+                },
+              }}
+            >
+              <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 1 }}>
+                <Typography sx={{ fontSize: 10.5, letterSpacing: "0.08em", color: "rgba(255,255,255,0.6)", fontWeight: 800 }}>
+                  TOKENS CONSUMED
+                </Typography>
+                <KeyboardArrowDownIcon
+                  sx={{
+                    fontSize: 18,
+                    color: "rgba(255,255,255,0.7)",
+                    transform: tokenPopoverOpen ? "rotate(180deg)" : "rotate(0deg)",
+                    transition: "transform 160ms ease",
+                  }}
+                />
+              </Box>
+              <Box sx={{ display: "flex", alignItems: "baseline", gap: 0.9, flexWrap: "wrap" }}>
+                <Typography sx={{ fontSize: { xs: 20, md: 23 }, lineHeight: 1, fontWeight: 800, letterSpacing: "-0.05em" }}>
+                  {data.tokensConsumedDisplay || "-"}
+                </Typography>
+                {data.investigationRunCount > 0 ? (
+                  <Typography sx={{ color: "rgba(255,255,255,0.7)", fontSize: 11.25, lineHeight: 1.35 }}>
+                    {data.investigationRunCount} reruns · hover for breakdown
+                  </Typography>
+                ) : data.tokensConsumedNote ? (
+                  <Typography sx={{ color: "rgba(255,255,255,0.7)", fontSize: 11.25, lineHeight: 1.35 }}>
+                    {data.tokensConsumedNote}
+                  </Typography>
+                ) : null}
+              </Box>
+            </Box>
+
+            <TokenBreakdownPopover
+              open={tokenPopoverOpen}
+              runs={data.investigationRuns || []}
+              totalTokens={data.totalTokensConsumed || 0}
+            />
+          </Box>
         </Box>
       </Box>
     </Paper>
+  );
+}
+
+function TokenBreakdownPopover({
+  open,
+  runs,
+  totalTokens,
+}: {
+  open: boolean;
+  runs: Array<{
+    runNumber?: number;
+    runType?: string;
+    tokensConsumed?: number;
+    createdAt?: string | null;
+  }>;
+  totalTokens: number;
+}) {
+  return (
+    <Box
+      sx={{
+        position: "absolute",
+        top: "calc(100% + 10px)",
+        left: 0,
+        right: 0,
+        zIndex: 50,
+        visibility: open ? "visible" : "hidden",
+        opacity: open ? 1 : 0,
+        pointerEvents: open ? "auto" : "none",
+        transition: "opacity 120ms ease",
+      }}
+    >
+      <Paper
+        sx={{
+          width: "100%",
+          boxSizing: "border-box",
+          borderRadius: 4,
+          bgcolor: "#18213A",
+          color: "#E5E7EB",
+          border: "1px solid rgba(255,255,255,0.08)",
+          boxShadow: "0 28px 60px rgba(15,23,42,0.45)",
+          p: 2,
+        }}
+      >
+        <Typography sx={{ fontSize: 10.5, fontWeight: 800, letterSpacing: "0.1em", color: "rgba(255,255,255,0.7)" }}>
+          INVESTIGATION RERUNS
+        </Typography>
+
+        <Box sx={{ mt: 1.4, display: "grid", gap: 1 }}>
+          {runs.length > 0 ? (
+            runs.map((run, index) => (
+              <Box
+                key={`${run.runNumber ?? index}-${index}`}
+                sx={{
+                  display: "grid",
+                  gridTemplateColumns: "36px 1fr auto",
+                  alignItems: "center",
+                  gap: 1.25,
+                  px: 1,
+                  py: 0.9,
+                  borderRadius: 3,
+                  bgcolor: "rgba(255,255,255,0.06)",
+                }}
+              >
+                <Box sx={{ width: 24, height: 24, borderRadius: "50%", display: "grid", placeItems: "center", bgcolor: "rgba(255,255,255,0.12)", fontWeight: 800, color: "#F8FAFC", fontSize: 10.5 }}>
+                  {index + 1}
+                </Box>
+                <Box>
+                  <Typography sx={{ fontSize: 13.5, fontWeight: 800, lineHeight: 1.05, color: "#F8FAFC" }}>
+                    {formatRunLabel(run, index)}
+                  </Typography>
+                  <Typography sx={{ mt: 0.2, fontSize: 9.5, color: "rgba(255,255,255,0.48)", letterSpacing: "0.01em" }}>
+                    {formatRunTime(run.createdAt)}
+                  </Typography>
+                </Box>
+                <Typography sx={{ fontSize: 13.5, fontWeight: 700, letterSpacing: "0.02em", color: "#E5E7EB" }}>
+                  {(run.tokensConsumed ?? 0).toLocaleString("en-US")}
+                </Typography>
+              </Box>
+            ))
+          ) : (
+            <Box sx={{ px: 1.4, py: 1.25, borderRadius: 3, bgcolor: "rgba(255,255,255,0.06)" }}>
+              <Typography sx={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>
+                No rerun history available yet
+              </Typography>
+              <Typography sx={{ mt: 0.4, fontSize: 12, color: "rgba(255,255,255,0.45)" }}>
+                Once the investigation runs are stored, each run will appear here with its token count.
+              </Typography>
+            </Box>
+          )}
+        </Box>
+
+        <Divider sx={{ my: 1.8, borderColor: "rgba(255,255,255,0.12)" }} />
+
+        <Box sx={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <Typography sx={{ fontSize: 11.5, fontWeight: 800, color: "rgba(255,255,255,0.72)", letterSpacing: "0.08em" }}>
+            TOTAL
+          </Typography>
+          <Typography sx={{ fontSize: 13, fontWeight: 900, color: "#fff", lineHeight: 1 }}>
+            {totalTokens.toLocaleString("en-US")}
+          </Typography>
+        </Box>
+      </Paper>
+    </Box>
   );
 }
 
@@ -410,9 +616,9 @@ function ExecutiveSummarySection({ data }: { data: AnyObj }) {
 
   return (
     <Paper sx={{ mt: 2, p: { xs: 2, md: 2.25 }, borderRadius: 4 }}>
-      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.45fr 1fr" }, gap: 1.5 }}>
+      <Box sx={{ display: "grid", gridTemplateColumns: { xs: "1fr", md: "1.62fr 0.92fr" }, gap: 1.5, alignItems: "stretch", minWidth: 0 }}>
         <SectionCard title="ROOT CAUSE" accent="red" large>
-          <Box sx={{ display: "grid", gap: 1.6 }}>
+          <Box sx={{ display: "grid", gap: 1.5 }}>
             <Typography sx={{ color: "#111827", fontSize: { xs: 15, md: 16 }, lineHeight: 1.55 }}>
               {data.executiveRootCause}
             </Typography>
@@ -435,9 +641,9 @@ function ExecutiveSummarySection({ data }: { data: AnyObj }) {
             <Typography sx={{ mt: 1, color: "#6B7280", fontSize: 12.5, lineHeight: 1.35 }}>
               High confidence - evidence is deterministic and reproducible.
             </Typography>
-            <Box sx={{ mt: 1.8, display: "grid", gap: 0.95 }}>
+            <Box sx={{ mt: 1.8, display: "grid", gap: 0.85 }}>
               <MetricLine label="Severity" value={severity} tone="severity" />
-              <MetricLine label="Risk" value={risk} tone="risk" />
+              <RiskMetric value={risk} />
             </Box>
           </Box>
         </SectionCard>
@@ -635,7 +841,8 @@ function mapBackendTechState(
     normalized === "HEALTHY" ||
     normalized === "SUCCESS" ||
     normalized === "OK" ||
-    normalized === "PASS"
+    normalized === "PASS" ||
+    normalized === "LOW"
   ) {
     return "Healthy";
   }
@@ -675,7 +882,10 @@ function buildTechnicalCards(data: AnyObj) {
     {
       show: true,
       title: data.logsTitle || "Logs",
-      summary: data.logsSummary || "-",
+      summary:
+        data.logsSummary !== "-"
+          ? data.logsSummary
+          : "No application log evidence available.",
       detail: buildLogsDetail(data),
       state: mapBackendTechState(
         data.logsStatus,
@@ -688,22 +898,11 @@ function buildTechnicalCards(data: AnyObj) {
 
     {
       show: true,
-      title: "Resource Utilization",
-      summary: data.metricsSummary || "Resource usage checked",
-      detail: buildResourceUtilizationDetail(data),
-      state: mapBackendTechState(
-        data.metricsStatus,
-        data.metricsSummary,
-        data.metricsCount,
-        "metrics"
-      ),
-      icon: <Activity size={18} />,
-    },
-
-    {
-      show: true,
       title: data.metricsTitle || "Metrics",
-      summary: data.metricsSummary || "-",
+      summary:
+        data.metricsSummary !== "-"
+          ? data.metricsSummary
+          : "No metrics evidence available.",
       detail: buildMetricsDetail(data),
       state: mapBackendTechState(
         data.metricsStatus,
@@ -759,7 +958,7 @@ function buildTechnicalCards(data: AnyObj) {
     {
       show: true,
       title: "Pods",
-      summary: data.kubernetesSummary || "Pod readiness checked",
+      summary: buildPodsDetail(data),
       detail: buildPodsDetail(data),
       state: mapBackendTechState(
         data.podsStatus || data.kubernetesStatus,
@@ -839,8 +1038,13 @@ function buildTechnicalCards(data: AnyObj) {
   }>;
 }
 
-function inferTechState(summary: unknown, count: number, kind: string) {
+function inferTechState(
+  summary: unknown,
+  count: number,
+  kind: string
+): TechState {
   const text = String(summary || "").toLowerCase();
+
   if (
     text.includes("degraded") ||
     text.includes("outofsync") ||
@@ -855,21 +1059,30 @@ function inferTechState(summary: unknown, count: number, kind: string) {
   ) {
     return "Problem";
   }
+
   if (
     text.includes("warning") ||
     text.includes("partial") ||
     text.includes("drift") ||
-    text.includes("change") ||
-    text.includes("rolled out") ||
-    text.includes("inspected") ||
-    (kind === "security" && count > 0)
+    text.includes("near limit") ||
+    text.includes("over limit")
   ) {
     return "Warning";
   }
-  if (count > 0 || text.includes("healthy") || text.includes("ready") || text.includes("pass")) {
+
+  if (
+    text.includes("healthy") ||
+    text.includes("ready") ||
+    text.includes("available") ||
+    text.includes("success") ||
+    text.includes("pass") ||
+    text.includes("within limits") ||
+    count > 0
+  ) {
     return "Healthy";
   }
-  return "Warning";
+
+  return "Unknown";
 }
 
 function StatusSummaryPill({
@@ -990,59 +1203,177 @@ function TechnicalCard({
 
 function buildMetricsDetail(data: AnyObj) {
   const metrics = data.metricsRaw || {};
-  const cpu = describeCpuMetric(metrics.cpu);
-  const rate = describeRateMetric(metrics, data.metricsFindings, data.metricsSummary);
-  const latency = describeLatencyMetric(metrics, data.metricsFindings, data.metricsSummary);
-  return compactJoin([
-    cpu ? `CPU ${cpu}` : "",
-    rate ? rate : "",
-    latency ? `latency ${latency}` : "",
-  ]) || firstSentence([data.metricsFindings, data.metricsSummary]) || "Metrics reviewed.";
+
+  const pods = Array.isArray(metrics.pods)
+    ? metrics.pods
+    : [];
+
+  if (pods.length) {
+    const details = pods.slice(0, 2).map((pod: AnyObj) => {
+      const podName = pod.pod || "pod";
+
+      const cpu =
+        pod.cpu_millicores != null
+          ? `CPU ${Number(pod.cpu_millicores).toFixed(2)}m`
+          : "";
+
+      const memory =
+        pod.memory_mb != null
+          ? `Memory ${Number(pod.memory_mb).toFixed(2)}MB`
+          : "";
+
+      const networkRx =
+        pod.network_rx_bytes != null
+          ? `RX ${Number(pod.network_rx_bytes).toFixed(2)}B/s`
+          : "";
+
+      const networkTx =
+        pod.network_tx_bytes != null
+          ? `TX ${Number(pod.network_tx_bytes).toFixed(2)}B/s`
+          : "";
+
+      return compactJoin([
+        podName,
+        cpu,
+        memory,
+        networkRx,
+        networkTx,
+      ]);
+    });
+
+    const evidence = details.filter(Boolean).join(" · ");
+
+    if (evidence) {
+      return evidence;
+    }
+  }
+
+  return (
+    firstSentence([
+      data.metricsFindings,
+      data.metricsSummary,
+    ]) ||
+    "No detailed metric values were returned."
+  );
 }
 
 function buildResourceUtilizationDetail(data: AnyObj) {
   const metrics = data.metricsRaw || {};
-  const cpu = describeCpuUtilization(metrics.cpu, data.metricsFindings, data.metricsSummary);
-  const memory = describeMemoryUtilization(metrics.memory, data.metricsFindings, data.metricsSummary);
-  const cpuStatus = utilizationStatus(cpu);
-  const memoryStatus = utilizationStatus(memory);
+  const pods = Array.isArray(metrics.pods)
+    ? metrics.pods
+    : [];
 
-  const cpuText = cpu != null ? `CPU ${cpu}% ${cpuStatus}` : "";
-  const memoryText = memory != null ? `memory ${memory}% ${memoryStatus}` : "";
-  const limitText = cpuStatus === "within limits" && memoryStatus === "within limits"
-    ? "well within limits"
-    : "check limits";
+  if (!pods.length) {
+    return "No resource utilization data available.";
+  }
 
-  return compactJoin([
-    cpuText,
-    memoryText,
-    `utilization ${limitText}`,
-  ]) || "Resource utilization reviewed.";
+  const details = pods.slice(0, 2).map((pod: AnyObj) => {
+    const cpu =
+      pod.cpu_millicores != null
+        ? `CPU ${Number(pod.cpu_millicores).toFixed(2)}m`
+        : "";
+
+    const memory =
+      pod.memory_mb != null
+        ? `memory ${Number(pod.memory_mb).toFixed(2)}MB`
+        : "";
+
+    return compactJoin([
+      pod.pod || "pod",
+      cpu,
+      memory,
+      "within limits",
+    ]);
+  });
+
+  return details.filter(Boolean).join(" · ");
 }
 
 function buildKubernetesDetail(data: AnyObj) {
-  const pods = Array.isArray(data.kubernetesPods) ? data.kubernetesPods : [];
-  const running = pods.filter((pod) => isPodRunning(pod)).length;
-  const total = pods.length;
-  const state = summarizePodState(pods, data.kubernetesSummary, data.kubernetesFindings);
-  const fallback = firstSentence([data.kubernetesFindings, data.kubernetesSummary]) || "Pods inspected.";
+  const pods = Array.isArray(data.kubernetesPods)
+    ? data.kubernetesPods
+    : [];
+
+  if (!pods.length) {
+    return (
+      firstSentence([
+        data.kubernetesFindings,
+        data.kubernetesSummary,
+      ]) || "No Kubernetes pod evidence available."
+    );
+  }
+
+  const running = pods.filter((pod: AnyObj) =>
+    isPodRunning(pod)
+  ).length;
+
+  const ready = pods.filter((pod: AnyObj) =>
+    isPodReady(pod)
+  ).length;
+
+  const names = pods
+    .slice(0, 2)
+    .map((pod: AnyObj) => pod.name || pod.pod)
+    .filter(Boolean);
+
   return compactJoin([
-    total ? `${running}/${total} pods running` : fallback,
-    state ? state : "",
-  ]) || fallback;
+    `${ready || running}/${pods.length} pods ready`,
+    `${running}/${pods.length} running`,
+    names.length ? names.join(", ") : "",
+  ]);
 }
 
 function buildDeploymentDetail(data: AnyObj) {
-  const history = Array.isArray(data.deploymentHistory) ? data.deploymentHistory : [];
-  const last = history[0];
-  const deployedAt = firstText([last?.deployed_at, data.deploymentRaw?.deployed_at]);
-  const revision = firstText([last?.revision, data.deploymentRaw?.revision]);
-  const app = firstText([data.deploymentRaw?.application, data.applicationName, data.heroApp]);
-  return compactJoin([
-    app ? `${app} deployed` : "",
-    revision ? `revision ${revision}` : "",
-    deployedAt ? `at ${formatDate(deployedAt)}` : "",
-  ]) || firstSentence([data.deploymentsFindings, data.deploymentsSummary]) || "Deployment history reviewed.";
+  const deployment = data.deploymentRaw || {};
+  const history = Array.isArray(data.deploymentHistory)
+    ? data.deploymentHistory
+    : [];
+
+  const last = history[0] || {};
+
+  const deploymentName =
+    firstText([
+      deployment.name,
+      deployment.deployment,
+      data.deploymentName,
+      data.applicationName,
+    ]);
+
+  const image =
+    firstText([
+      deployment.image,
+      deployment.image_tag,
+      last.image,
+      last.image_tag,
+    ]);
+
+  const ready =
+    deployment.ready ??
+    deployment.available ??
+    deployment.replicas_ready;
+
+  const replicas =
+    deployment.replicas ??
+    deployment.desired_replicas;
+
+  return (
+    compactJoin([
+      deploymentName
+        ? `${deploymentName} deployed`
+        : "",
+      ready != null && replicas != null
+        ? `${ready}/${replicas} available`
+        : "",
+      image
+        ? `image ${image}`
+        : "",
+    ]) ||
+    firstSentence([
+      data.deploymentsFindings,
+      data.deploymentsSummary,
+    ]) ||
+    "No deployment evidence available."
+  );
 }
 
 function buildPodsDetail(data: AnyObj) {
@@ -1220,15 +1551,24 @@ function utilizationStatus(value: number | null) {
 }
 
 function isPodRunning(pod: AnyObj) {
-  const phase = compactText(pod.phase || pod.status || pod.state).toLowerCase();
-  const ready = compactText(pod.ready || pod.ready_status || pod.readiness).toLowerCase();
-  return phase.includes("running") || ready === "true" || ready === "ready";
+  const phase = compactText(
+    pod.phase || pod.status || pod.state
+  ).toLowerCase();
+
+  return phase === "running";
 }
 
 function isPodReady(pod: AnyObj) {
-  const phase = compactText(pod.phase || pod.status || pod.state).toLowerCase();
-  const ready = compactText(pod.ready || pod.ready_status || pod.readiness).toLowerCase();
-  return ready === "true" || ready === "ready" || phase.includes("running");
+  const ready = compactText(
+    pod.ready ||
+    pod.ready_status ||
+    pod.readiness
+  ).toLowerCase();
+
+  return (
+    ready === "true" ||
+    ready === "ready"
+  );
 }
 
 function summarizeProbeStatus(pods: AnyObj[], probe: "liveness" | "readiness") {
@@ -2119,6 +2459,41 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
     "No dynamic data available.";
   const confidence = report?.hero?.confidence ?? latestAi?.hero?.confidence ?? investigationResult?.confidence ?? aiResult?.confidence ?? job?.evidence?.overall ?? null;
   const investigationTime = report?.hero?.duration ?? latestAi?.hero?.duration ?? investigationResult?.investigation_time ?? aiResult?.estimated_recovery_time ?? null;
+  const exactTokenUsage = firstText([
+    report?.footer?.tokens_consumed,
+    report?.footer?.token_usage,
+    report?.footer?.usage?.total_tokens,
+    report?.footer?.usage?.tokens,
+    report?.usage?.total_tokens,
+    report?.usage?.tokens,
+    job?.usage?.total_tokens,
+    job?.usage?.tokens,
+    job?.result?.footer?.tokens_consumed,
+    job?.result?.footer?.token_usage,
+    job?.result?.footer?.usage?.total_tokens,
+    job?.result?.footer?.usage?.tokens,
+    job?.result?.usage?.total_tokens,
+    job?.result?.usage?.tokens,
+    incidentPayload?.latest_ai?.footer?.tokens_consumed,
+    incidentPayload?.latest_ai?.footer?.token_usage,
+    incidentPayload?.latest_ai?.footer?.usage?.total_tokens,
+    incidentPayload?.latest_ai?.footer?.usage?.tokens,
+  ]);
+  const estimatedTokenUsage = estimateTokensFromPayload({ job, report, incidentPayload });
+  const investigationRuns = normalizeInvestigationRuns(
+    job?.investigation_runs,
+    exactTokenUsage,
+    estimatedTokenUsage,
+    report?.footer?.generated_at ?? job?.completed_at ?? job?.started_at ?? null
+  );
+  const totalTokensConsumed = investigationRuns.reduce(
+    (sum, run) => sum + (run.tokensConsumed || 0),
+    0
+  );
+  const tokenTotalDisplay = totalTokensConsumed > 0
+    ? totalTokensConsumed.toLocaleString("en-US")
+    : exactTokenUsage || estimatedTokenUsage.toLocaleString("en-US");
+  const tokenRerunCount = Math.max(0, investigationRuns.length - 1);
   console.log("FULL REPORT", report);
 
   const failureReason = job?.error ?? job?.current_step ?? report?.ai_investigation?.failure_point ?? latestAi?.ai_investigation?.failure_point ?? null;
@@ -2156,7 +2531,51 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
     job?.incident?.short_description ??
     job?.current_step ??
     "Investigation failed";
-  const tech = report?.technical_investigation ?? {};
+  const reportTech = report?.technical_investigation ?? {};
+  const jobTech = job?.technical_investigation ?? {};
+
+  const tech = {
+    logs: {
+      ...(jobTech.logs ?? {}),
+      ...(reportTech.logs ?? {}),
+    },
+    metrics: {
+      ...(jobTech.metrics ?? {}),
+      ...(reportTech.metrics ?? {}),
+    },
+    deployment: {
+      ...(jobTech.deployment ?? {}),
+      ...(reportTech.deployment ?? {}),
+    },
+    kubernetes: {
+      ...(jobTech.kubernetes ?? {}),
+      ...(reportTech.kubernetes ?? {}),
+    },
+    network: {
+      ...(jobTech.network ?? {}),
+      ...(reportTech.network ?? {}),
+    },
+    pods: {
+      ...(jobTech.pods ?? {}),
+      ...(reportTech.pods ?? {}),
+    },
+    dependency: {
+      ...(jobTech.dependency ?? {}),
+      ...(reportTech.dependency ?? {}),
+    },
+    pubsub: {
+      ...(jobTech.pubsub ?? {}),
+      ...(reportTech.pubsub ?? {}),
+    },
+    database: {
+      ...(jobTech.database ?? {}),
+      ...(reportTech.database ?? {}),
+    },
+    redis: {
+      ...(jobTech.redis ?? {}),
+      ...(reportTech.redis ?? {}),
+    },
+  };
   const infra = report?.infrastructure ?? [];
   const kubernetesResources =
     report?.kubernetes_resources ??
@@ -2227,6 +2646,11 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
       aiResult?.estimated_recovery_time ??
       "-"
     ),
+    tokensConsumedDisplay: tokenTotalDisplay,
+    tokensConsumedNote: exactTokenUsage ? "" : "estimated from investigation payload",
+    investigationRuns,
+    investigationRunCount: tokenRerunCount,
+    totalTokensConsumed,
 
     executiveRootCause: isFailed ? rootCause : rootCause,
     severity: deriveSeverity(job, report, latestAi),
@@ -2255,42 +2679,156 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
     agentLog: isFailed ? agentLog : [],
     failureTitle,
 
-    logsTitle: tech.logs?.title ?? "Logs",
-    logsStatus: tech.logs?.status ?? null,
-    logsSummary: tech.logs?.summary ?? "-",
-    logsCount: tech.logs?.findings?.length ?? 0,
-    logsFindings: extractStrings(tech.logs?.findings),
+    logsTitle:
+      job?.logs?.assessment?.title ??
+      tech.logs?.title ??
+      "Logs",
 
-    metricsTitle: tech.metrics?.title ?? "Metrics",
-    metricsStatus: tech.metrics?.status ?? null,
-    metricsSummary: tech.metrics?.summary ?? "-",
-    metricsCount: tech.metrics?.findings?.length ?? 0,
-    metricsFindings: extractStrings(tech.metrics?.findings),
-    metricsRaw: job?.metrics ?? report?.metrics ?? null,
+    logsStatus:
+      job?.logs?.assessment?.severity ??
+      tech.logs?.status ??
+      null,
 
-    deploymentsTitle: tech.deployment?.title ?? "Deployment",
-    deploymentsStatus: tech.deployment?.status ?? null,
-    deploymentsSummary: tech.deployment?.summary ?? "-",
-    deploymentsCount: tech.deployment?.findings?.length ?? 0,
-    deploymentsFindings: extractStrings(tech.deployment?.findings),
+    logsSummary:
+      job?.logs?.assessment?.summary ??
+      tech.logs?.summary ??
+      "-",
+
+    logsCount:
+      job?.logs?.assessment?.findings?.length ??
+      tech.logs?.findings?.length ??
+      0,
+
+    logsFindings: extractStrings(
+      job?.logs?.assessment?.findings,
+      tech.logs?.findings,
+    ),
+
+    metricsTitle:
+      job?.metrics?.assessment?.title ??
+      tech.metrics?.title ??
+      "Metrics",
+
+    metricsStatus:
+      job?.metrics?.assessment?.severity ??
+      tech.metrics?.status ??
+      null,
+
+    metricsSummary:
+      job?.metrics?.assessment?.summary ??
+      tech.metrics?.summary ??
+      "-",
+
+    metricsCount:
+      job?.metrics?.assessment?.findings?.length ??
+      tech.metrics?.findings?.length ??
+      0,
+
+    metricsFindings: extractStrings(
+      job?.metrics?.assessment?.findings,
+      tech.metrics?.findings,
+    ),
+
+    metricsRaw:
+      job?.metrics ??
+      report?.metrics ??
+      null,
+
+    deploymentsTitle:
+      job?.deployment?.assessment?.title ??
+      tech.deployment?.title ??
+      "Deployment",
+
+    deploymentsStatus:
+      job?.deployment?.assessment?.severity ??
+      tech.deployment?.status ??
+      null,
+
+    deploymentsSummary:
+      job?.deployment?.assessment?.summary ??
+      tech.deployment?.summary ??
+      "-",
+
+    deploymentsCount:
+      job?.deployment?.assessment?.findings?.length ??
+      tech.deployment?.findings?.length ??
+      0,
+
+    deploymentsFindings: extractStrings(
+      job?.deployment?.assessment?.findings,
+      tech.deployment?.findings,
+    ),
+
     deploymentHistory,
-    deploymentRaw: job?.deployment ?? report?.deployment ?? null,
 
-    kubernetesTitle: tech.kubernetes?.title ?? "Kubernetes",
-    kubernetesStatus: tech.kubernetes?.status ?? null,
-    kubernetesSummary: tech.kubernetes?.summary ?? "-",
-    kubernetesCount: tech.kubernetes?.findings?.length ?? 0,
-    kubernetesFindings: extractStrings(tech.kubernetes?.findings),
+    deploymentRaw:
+      job?.deployment ??
+      report?.deployment ??
+      null,
+
+    kubernetesTitle:
+      job?.kubernetes?.assessment?.title ??
+      tech.kubernetes?.title ??
+      "Kubernetes",
+
+    kubernetesStatus:
+      job?.kubernetes?.assessment?.severity ??
+      tech.kubernetes?.status ??
+      null,
+
+    kubernetesSummary:
+      job?.kubernetes?.assessment?.summary ??
+      tech.kubernetes?.summary ??
+      "-",
+
+    kubernetesCount:
+      job?.kubernetes?.assessment?.findings?.length ??
+      tech.kubernetes?.findings?.length ??
+      0,
+
+    kubernetesFindings: extractStrings(
+      job?.kubernetes?.assessment?.findings,
+      tech.kubernetes?.findings,
+    ),
+
     kubernetesPods,
     kubernetesEvents,
-    kubernetesRaw: job?.kubernetes ?? report?.kubernetes ?? null,
-    podsStatus: tech.pods?.status ?? tech.kubernetes?.status ?? null,
 
-    networkTitle: tech.network?.title ?? "Network",
-    networkStatus: tech.network?.status ?? null,
-    networkSummary: tech.network?.summary ?? "-",
-    networkCount: tech.network?.findings?.length ?? 0,
-    networkFindings: extractStrings(tech.network?.findings),
+    kubernetesRaw:
+      job?.kubernetes ??
+      report?.kubernetes ??
+      null,
+
+    podsStatus:
+      job?.kubernetes?.assessment?.severity ??
+      tech.pods?.status ??
+      tech.kubernetes?.status ??
+      null,
+
+    networkTitle:
+      job?.network?.assessment?.title ??
+      tech.network?.title ??
+      "Network",
+
+    networkStatus:
+      job?.network?.assessment?.severity ??
+      tech.network?.status ??
+      null,
+
+    networkSummary:
+      job?.network?.assessment?.summary ??
+      tech.network?.summary ??
+      "-",
+
+    networkCount:
+      job?.network?.assessment?.findings?.length ??
+      tech.network?.findings?.length ??
+      0,
+
+    networkFindings: extractStrings(
+      job?.network?.assessment?.findings,
+      tech.network?.findings,
+    ),
 
     depsTitle: tech.dependency?.title ?? "Dependencies",
     depsSummary: tech.dependency?.summary ?? "-",
@@ -2394,6 +2932,94 @@ function buildData(job: AnyObj | null, report: AnyObj | null, incidentPayload: A
       "-",
     agentVersion: report?.footer?.agent_version ?? "AI SRE Agent v4.2.1",
   };
+}
+
+function normalizeInvestigationRuns(
+  runs: unknown,
+  fallbackTokens?: string | number | null,
+  estimatedTokens?: number,
+  initialCreatedAt?: string | null
+) {
+  const items = Array.isArray(runs) ? runs : [];
+  const mapped = items
+    .map((run: AnyObj, index: number) => ({
+      id: run?.id ?? index + 1,
+      runNumber: Number(run?.run_number ?? index + 1),
+      runType: String(run?.run_type ?? (index === 0 ? "initial" : "restart")),
+      tokensConsumed: Number(run?.tokens_consumed ?? 0),
+      createdAt: run?.created_at ?? null,
+    }))
+    .filter((run) => Number.isFinite(run.tokensConsumed));
+
+  const initialTokens = parseTokenValue(fallbackTokens) ?? estimatedTokens ?? 0;
+
+  if (mapped.length === 0) {
+    if (initialTokens > 0) {
+      return [
+        {
+          id: 1,
+          runNumber: 1,
+          runType: "initial",
+          tokensConsumed: initialTokens,
+          createdAt: initialCreatedAt ?? null,
+        },
+      ];
+    }
+
+    return [];
+  }
+
+  const hasInitial = mapped.some((run) => run.runNumber === 1 || run.runType === "initial");
+
+  if (!hasInitial && initialTokens > 0) {
+    return [
+      {
+        id: 1,
+        runNumber: 1,
+        runType: "initial",
+        tokensConsumed: initialTokens,
+        createdAt: initialCreatedAt ?? null,
+      },
+      ...mapped.map((run, index) => ({
+        ...run,
+        runNumber: run.runNumber > 1 ? run.runNumber : index + 2,
+      })),
+    ];
+  }
+
+  return mapped;
+}
+
+function parseTokenValue(value?: string | number | null) {
+  if (value == null || value === "") return null;
+
+  const parsed = Number(String(value).replace(/,/g, ""));
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+function formatRunLabel(run: InvestigationRun, index: number) {
+  if (index === 0) return "Initial run";
+  return `Rerun ${index}`;
+}
+
+function formatRunTime(createdAt?: string | null) {
+  if (!createdAt) return "—";
+  const parsed = new Date(createdAt);
+  if (Number.isNaN(parsed.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: "Asia/Kolkata",
+  }).format(parsed).replace(",", "");
+}
+
+function estimateTokensFromPayload(payload: AnyObj) {
+  const serialized = JSON.stringify(payload ?? {});
+  return Math.max(0, Math.round(serialized.length / 4));
 }
 
 function formatTimelineTimeIST(value: string | null | undefined) {
@@ -4197,8 +4823,10 @@ function SectionCard({
 }) {
   return (
     <Paper sx={{ p: 1.5, borderRadius: 4, borderLeft: accent ? `4px solid ${accent === "red" ? "#EF4444" : accent}` : undefined }}>
-      <Typography sx={{ fontSize: 9.5, fontWeight: 800, letterSpacing: "0.08em", color: "#6B7280" }}>{title}</Typography>
-      <Typography sx={{ mt: large ? 0.8 : 0.6, fontSize: large ? 13.5 : 11.8, lineHeight: 1.4, color: "#111827" }}>{children}</Typography>
+        <Typography sx={{ fontSize: 9.5, fontWeight: 800, letterSpacing: "0.08em", color: "#6B7280" }}>{title}</Typography>
+      <Box sx={{ mt: large ? 0.8 : 0.6, color: "#111827" }}>
+        {children}
+      </Box>
     </Paper>
   );
 }
@@ -4275,6 +4903,78 @@ function MetricLine({
   );
 }
 
+function RiskMetric({ value }: { value: string }) {
+  const summary = splitRiskSummary(value);
+
+  return (
+    <Box
+      sx={{
+        p: 1.1,
+        borderRadius: 3,
+        border: "1px solid #E5E7EB",
+        background:
+          "linear-gradient(180deg, rgba(248,250,252,0.98), rgba(255,255,255,0.98))",
+        boxShadow: "0 8px 18px rgba(15, 23, 42, 0.04)",
+        minWidth: 0,
+      }}
+    >
+      <Box sx={{ display: "flex", justifyContent: "space-between", gap: 2, alignItems: "center" }}>
+        <Typography sx={{ color: "#6B7280", fontSize: 12.5 }}>Risk</Typography>
+      </Box>
+
+          <Box
+          sx={{
+            mt: 0.85,
+            p: 1.05,
+            borderRadius: 2.25,
+            bgcolor: "#F5F8FF",
+            border: "1px solid #DCE6FF",
+            minWidth: 0,
+          }}
+        >
+        <Typography
+          sx={{
+            color: "#1E3A8A",
+            fontSize: 12.5,
+            lineHeight: 1.45,
+            fontWeight: 700,
+            textAlign: "left",
+            whiteSpace: "normal",
+            overflowWrap: "anywhere",
+            wordBreak: "break-word",
+            maxWidth: "100%",
+          }}
+        >
+          {summary.message}
+        </Typography>
+      </Box>
+    </Box>
+  );
+}
+
+function splitRiskSummary(value: string) {
+  const raw = String(value || "").trim();
+  const [head, ...rest] = raw.split(/-\s+/);
+  const level = (head || raw || "Risk").trim();
+  const message = rest.length ? rest.join(" - ").trim() : raw;
+  const lower = level.toLowerCase();
+
+  const tone =
+    lower.includes("high") || lower.includes("critical")
+      ? { bg: "#FEE2E2", fg: "#B91C1C" }
+      : lower.includes("medium")
+        ? { bg: "#FEF3C7", fg: "#B45309" }
+        : lower.includes("low")
+          ? { bg: "#DCFCE7", fg: "#15803D" }
+          : { bg: "#E2E8F0", fg: "#334155" };
+
+  return {
+    level,
+    message,
+    tone,
+  };
+}
+
 function ActionButton({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
     <Button variant="outlined" startIcon={icon} sx={actionBtnSx}>
@@ -4289,9 +4989,20 @@ function MetaPill({ children }: { children: React.ReactNode }) {
 
 function HeroStat({ label, value }: { label: string; value: string }) {
   return (
-    <Box sx={{ p: 2, borderRadius: 3, bgcolor: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}>
-      <Typography sx={{ fontSize: 12, letterSpacing: "0.08em", color: "rgba(255,255,255,0.6)", fontWeight: 800 }}>{label}</Typography>
-      <Typography sx={{ mt: 0.6, fontSize: 18, fontWeight: 800 }}>{value}</Typography>
+    <Box
+      sx={{
+        p: { xs: 1.15, md: 1.3 },
+        minHeight: 76,
+        borderRadius: 2.6,
+        bgcolor: "rgba(255,255,255,0.08)",
+        border: "1px solid rgba(255,255,255,0.12)",
+        display: "flex",
+        flexDirection: "column",
+        justifyContent: "space-between",
+      }}
+    >
+      <Typography sx={{ fontSize: 10.5, letterSpacing: "0.08em", color: "rgba(255,255,255,0.6)", fontWeight: 800 }}>{label}</Typography>
+      <Typography sx={{ mt: 0.35, fontSize: { xs: 15.5, md: 17 }, fontWeight: 800, lineHeight: 1.1, letterSpacing: "-0.03em" }}>{value}</Typography>
     </Box>
   );
 }

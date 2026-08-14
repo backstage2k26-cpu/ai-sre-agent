@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
 
 import type { Incident } from "../types/incident";
 import { getIncidents } from "../services/incidentService";
@@ -155,6 +155,7 @@ function statusPillPalette(status: string) {
 }
 
 export default function Incidents() {
+  const location = useLocation();
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
@@ -163,6 +164,15 @@ export default function Incidents() {
   const [page, setPage] = useState(1);
   const [selectedIncident, setSelectedIncident] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+
+  useEffect(() => {
+    const state = location.state as { openIncident?: string } | null;
+
+    if (state?.openIncident) {
+      setSelectedIncident(state.openIncident);
+      setDialogOpen(true);
+    }
+  }, [location.state]);
 
   const loadIncidents = async () => {
     try {

@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 
 from app.clients.servicenow_client import ServiceNowClient
@@ -56,11 +56,12 @@ async def get_incident_trend():
 @router.get("/recent")
 def get_recent_incidents(
     db: Session = Depends(get_db),
+    limit: int = Query(20, ge=1, le=100),
 ):
     repo = IncidentRepository(db)
     investigation_repo = InvestigationRepository(db)
 
-    incidents = repo.list_recent(5)
+    incidents = repo.list_recent(limit)
 
     recent = []
 
