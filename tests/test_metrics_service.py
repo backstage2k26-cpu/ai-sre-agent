@@ -9,20 +9,36 @@ async def main():
 
     service = MetricsService()
 
-    result = await service.investigate(
-        InvestigationContext(
-            incident_number="INC1",
-            service_name="Market Service",
-            application_name="market-dev",
-            namespace="market-dev",
-            priority="1",
-            problem_type="Deployment Failure",
-            keywords=[],
-            search_window_minutes=60,
-        )
+    context = InvestigationContext(
+        incident_number="INC1",
+        service_name="market",
+        namespace="market-dev",
+        problem_type="application issue",
+        priority="P2",
+        search_window_minutes=60,
+        keywords=["market", "application"],
+        application_name="market",
+        argocd_application="market",
+        normalized_service="market",
     )
 
+    print("\n========================================")
+    print("       METRICS SERVICE TEST")
+    print("========================================")
+
+    print("\n--- INVESTIGATION CONTEXT ---")
+    pprint(context.model_dump())
+
+    print("\n--- RUNNING METRICS INVESTIGATION ---")
+
+    result = await service.investigate(context)
+
+    print("\n--- METRICS RESULT ---")
     pprint(result.model_dump())
+
+    print("\n========================================")
+    print("       TEST COMPLETE")
+    print("========================================")
 
 
 if __name__ == "__main__":

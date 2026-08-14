@@ -5,6 +5,7 @@ import traceback
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.exc import ProgrammingError
 
 from app.database.session import get_db
 from app.repositories.investigation_repository import InvestigationRepository
@@ -94,9 +95,13 @@ async def restart_investigation(
 
 
 @router.get("/investigations/{investigation_id}")
-async def get_investigation(investigation_id: str):
+async def get_investigation(
+    investigation_id: str,
+    db: Session = Depends(get_db),
+):
 
-    job = manager.get(investigation_id)
+    repository = InvestigationRepository(db)
+    job = repository.find_by_id(investigation_id)
 
     if not job:
         raise HTTPException(
@@ -104,7 +109,66 @@ async def get_investigation(investigation_id: str):
             detail="Investigation not found",
         )
 
-    return job
+    try:
+        runs = repository.list_runs(investigation_id)
+    except ProgrammingError as ex:
+        db.rollback()
+        if "investigation_runs" in str(ex).lower():
+            runs = []
+        else:
+            raise
+
+    report = job.report or {}
+    if (
+        job.status == "COMPLETED"
+        and not report.get("similar_incidents")
+    ):
+        try:
+            similar_service = SimilarIncidentService(repository)
+            incidents = await similar_service.find_similar_incidents(
+                investigation_id=investigation_id,
+                limit=5,
+            )
+
+            report = dict(report)
+            report["similar_incidents"] = [
+                item.model_dump() if hasattr(item, "model_dump") else item
+                for item in incidents
+            ]
+
+            updated = repository.update_report(
+                investigation_id,
+                report,
+            )
+            if updated is not None:
+                job = updated
+        except Exception:
+            traceback.print_exc()
+
+    return {
+        "id": job.id,
+        "investigation_id": job.investigation_id,
+        "incident_number": job.incident_number,
+        "incident_sys_id": job.incident_sys_id,
+        "status": job.status,
+        "progress": job.progress,
+        "current_step": job.current_step,
+        "started_at": job.started_at,
+        "completed_at": job.completed_at,
+        "report": report,
+        "error": job.error,
+        "investigation_runs": [
+            {
+                "id": run.id,
+                "investigation_id": run.investigation_id,
+                "run_number": run.run_number,
+                "run_type": run.run_type,
+                "tokens_consumed": run.tokens_consumed,
+                "created_at": run.created_at,
+            }
+            for run in runs
+        ],
+    }
 
 
 @router.get("/investigations")
@@ -160,6 +224,47 @@ async def get_similar_incidents(
         import traceback
         traceback.print_exc()
 
+        raise HTTPException(
+            status_code=500,
+            detail=str(ex),
+        )
+
+
+@router.post(
+    "/investigations/{investigation_id}/similar-incidents/refresh"
+)
+async def refresh_similar_incidents(
+    investigation_id: str,
+    db: Session = Depends(get_db),
+):
+    try:
+        repository = InvestigationRepository(db)
+        service = SimilarIncidentService(repository)
+
+        incidents = await service.find_similar_incidents(
+            investigation_id=investigation_id,
+            limit=5,
+        )
+
+        investigation = repository.find_by_id(investigation_id)
+        if investigation is not None:
+            report = dict(investigation.report or {})
+            report["similar_incidents"] = [
+                item.model_dump() if hasattr(item, "model_dump") else item
+                for item in incidents
+            ]
+            repository.update_report(investigation_id, report)
+
+        return incidents
+
+    except ValueError as ex:
+        raise HTTPException(
+            status_code=404,
+            detail=str(ex),
+        )
+
+    except Exception as ex:
+        traceback.print_exc()
         raise HTTPException(
             status_code=500,
             detail=str(ex),

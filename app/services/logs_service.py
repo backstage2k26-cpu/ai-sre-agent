@@ -1,26 +1,83 @@
-from app.clients.grafana_client import GrafanaClient
+import json
 from app.schemas.investigation import InvestigationContext
 from app.schemas.logs import LogsInfo
 from app.schemas.investigation_assessment import InvestigationAssessment
+from app.clients.grafana_investigation_mcp import GrafanaInvestigationMCP
+from app.clients.kubernetes_client import KubernetesClient
 
 
 class LogsService:
 
     def __init__(self):
-        self.client = GrafanaClient()
+        self.mcp_client = GrafanaInvestigationMCP()
+        self.kubernetes_client = KubernetesClient()
 
     async def investigate(
         self,
         context: InvestigationContext,
     ) -> LogsInfo:
 
-        logs = await self.client.query_logs(
+        # -----------------------------------------------------
+        # Kubernetes is the source of truth for application
+        # identity.
+        # -----------------------------------------------------
+
+        pod_names = await self.kubernetes_client.get_application_pods(
             namespace=context.namespace,
-            service=context.namespace,
-            minutes=context.search_window_minutes,
+            application_name=context.application_name,
         )
 
+        # No application pods found.
+        if not pod_names:
+
+            return self._build_logs_info([])
+
+        # -----------------------------------------------------
+        # Query Loki only for the application's pods.
+        # This prevents unrelated workloads in the same
+        # namespace from being treated as application logs.
+        # -----------------------------------------------------
+
+        escaped_pods = [
+            pod.replace("\\", "\\\\").replace('"', '\\"')
+            for pod in pod_names
+        ]
+
+        pod_regex = "|".join(escaped_pods)
+
+        logql = (
+            f'{{namespace="{context.namespace}", '
+            f'pod=~"{pod_regex}"}}'
+        )
+
+        result = await self.mcp_client.query_logs(
+            logql=logql,
+            start_time=f"now-{context.search_window_minutes}m",
+            end_time="now",
+            limit=100,
+        )
+
+        data = self._parse_mcp_result(result)
+
+        logs = []
+
+        for entry in data.get("data", []):
+
+            line = entry.get("line")
+
+            if line:
+                logs.append(line)
+
         return self._build_logs_info(logs)
+    
+    def _parse_mcp_result(self, result) -> dict:
+
+        if not result.content:
+            return {}
+
+        text = result.content[0].text
+
+        return json.loads(text)
 
     def _build_logs_info(
         self,

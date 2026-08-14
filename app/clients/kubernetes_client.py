@@ -236,3 +236,76 @@ class KubernetesClient:
             ),
             "pod_selector": selector,
         }
+    
+    async def get_application_pods(
+        self,
+        namespace: str,
+        application_name: str,
+    ):
+        """
+        Find the pods belonging to the requested application.
+
+        Kubernetes is the source of truth for application identity.
+        Loki is only used afterwards to retrieve logs for these pods.
+        """
+
+        application_name = application_name.lower().strip()
+
+        deployments = self.apps.list_namespaced_deployment(namespace)
+
+        matched_deployment = None
+
+        # Prefer the Kubernetes application label.
+        for deployment in deployments.items:
+
+            labels = (
+                deployment.spec.template.metadata.labels
+                or {}
+            )
+
+            if (
+                labels.get("app.kubernetes.io/name", "").lower()
+                == application_name
+            ):
+                matched_deployment = deployment
+                break
+
+        # Fallback to deployment name.
+        if not matched_deployment:
+
+            for deployment in deployments.items:
+
+                name = deployment.metadata.name.lower()
+
+                if (
+                    name == application_name
+                    or name.startswith(f"{application_name}-")
+                ):
+                    matched_deployment = deployment
+                    break
+
+        if not matched_deployment:
+            return []
+
+        selector = (
+            matched_deployment.spec.selector.match_labels
+            or {}
+        )
+
+        if not selector:
+            return []
+
+        label_selector = ",".join(
+            f"{key}={value}"
+            for key, value in selector.items()
+        )
+
+        pods = self.core.list_namespaced_pod(
+            namespace,
+            label_selector=label_selector,
+        )
+
+        return [
+            pod.metadata.name
+            for pod in pods.items
+        ]

@@ -3,6 +3,7 @@ from datetime import UTC, datetime, timedelta
 from sqlalchemy.orm import Session
 
 from app.models.investigation import Investigation, InvestigationStatus
+from app.models.investigation_run import InvestigationRun
 
 
 class InvestigationRepository:
@@ -35,6 +36,68 @@ class InvestigationRepository:
         self.db.refresh(investigation)
 
         return investigation
+
+    def _get_next_run_number(self, investigation_id: str) -> int:
+        latest = (
+            self.db.query(InvestigationRun)
+            .filter(
+                InvestigationRun.investigation_id == investigation_id
+            )
+            .order_by(InvestigationRun.run_number.desc())
+            .first()
+        )
+
+        return (latest.run_number if latest else 0) + 1
+
+    def create_run(
+        self,
+        investigation_id: str,
+        run_type: str,
+    ) -> InvestigationRun:
+        run = InvestigationRun(
+            investigation_id=investigation_id,
+            run_number=self._get_next_run_number(investigation_id),
+            run_type=run_type,
+            tokens_consumed=0,
+        )
+
+        self.db.add(run)
+        self.db.commit()
+        self.db.refresh(run)
+        return run
+
+    def update_run_tokens(
+        self,
+        investigation_id: str,
+        run_number: int,
+        tokens_consumed: int,
+    ) -> InvestigationRun | None:
+        run = (
+            self.db.query(InvestigationRun)
+            .filter(
+                InvestigationRun.investigation_id == investigation_id,
+                InvestigationRun.run_number == run_number,
+            )
+            .first()
+        )
+
+        if run is None:
+            return None
+
+        run.tokens_consumed = max(0, tokens_consumed)
+        self.db.commit()
+        self.db.refresh(run)
+        return run
+
+    def list_runs(self, investigation_id: str) -> list[InvestigationRun]:
+        return (
+            self.db.query(InvestigationRun)
+            .filter(
+                InvestigationRun.investigation_id == investigation_id
+            )
+            .order_by(InvestigationRun.run_number.asc())
+            .all()
+        )
 
     def find_by_id(
         self,
@@ -126,6 +189,23 @@ class InvestigationRepository:
         investigation.completed_at = datetime.now(UTC)
         investigation.report = report
 
+        self.db.commit()
+        self.db.refresh(investigation)
+
+        return investigation
+
+    def update_report(
+        self,
+        investigation_id: str,
+        report: dict,
+    ) -> Investigation | None:
+
+        investigation = self.find_by_id(investigation_id)
+
+        if investigation is None:
+            return None
+
+        investigation.report = report
         self.db.commit()
         self.db.refresh(investigation)
 

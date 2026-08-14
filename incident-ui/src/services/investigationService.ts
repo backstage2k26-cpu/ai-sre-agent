@@ -101,3 +101,20 @@ export async function getSimilarIncidents(
 
   return response.json();
 }
+
+export async function refreshSimilarIncidents(
+  investigationId: string
+): Promise<SimilarIncident[]> {
+  const response = await fetch(
+    `${API}/investigations/${investigationId}/similar-incidents/refresh`,
+    {
+      method: "POST",
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error("Failed to refresh similar incidents");
+  }
+
+  return response.json();
+}
